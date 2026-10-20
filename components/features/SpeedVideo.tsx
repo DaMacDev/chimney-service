@@ -15,13 +15,23 @@ interface SpeedVideoProps {
   caption: string;
   speedLabel: string;
   speedOptions: SpeedOption[];
+  /** Extra classes for the `<video>`, e.g. `aspect-[9/16]` for portrait footage. */
+  className?: string;
 }
 
 /**
- * Self-hosted clip with playback-speed buttons. The footage is already encoded at
- * 3x real time, so these multiply that again — see `docs/reference-existing-site.md`.
+ * Self-hosted clip with playback-speed buttons. The before/after footage is already
+ * encoded at 3x real time, so these multiply that again — see
+ * `docs/reference-existing-site.md`.
  */
-export function SpeedVideo({ src, poster, caption, speedLabel, speedOptions }: SpeedVideoProps) {
+export function SpeedVideo({
+  src,
+  poster,
+  caption,
+  speedLabel,
+  speedOptions,
+  className,
+}: SpeedVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [rate, setRate] = useState(1);
 
@@ -49,7 +59,7 @@ export function SpeedVideo({ src, poster, caption, speedLabel, speedOptions }: S
         onRateChange={() => {
           if (videoRef.current) setRate(videoRef.current.playbackRate);
         }}
-        className="aspect-video w-full bg-black object-cover"
+        className={cn("aspect-video w-full bg-black object-cover", className)}
       >
         <source src={src} type="video/mp4" />
       </video>

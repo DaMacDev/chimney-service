@@ -200,6 +200,17 @@
     "speedOptionLabel": "Play at {rate}× speed",
     "speedNote": "Footage accelerated 3× — a four-minute inspection in 80 seconds. Use the speed buttons to go faster still."
   },
+  "CleaningExamples": {
+    "title": "Cleaning examples",
+    "subtitle": "What we find inside ducts before we clean them: real photos and footage from client jobs.",
+    "items": {
+      "greaseDuct": "Extraction duct coated in grease build-up, before cleaning.",
+      "dustFloor": "Dust and debris collected along the floor of a ventilation duct.",
+      "ductInterior": "Duct interior before cleaning: dust, sediment and stains on every wall.",
+      "longRun": "A long duct run with heavy sediment, inspected before cleaning.",
+      "ductCloseUp": "Close-up of the dirt accumulated on the duct floor."
+    }
+  },
   "Videos": {
     "title": "Documented work",
     "subtitle": "Photographic evidence of real interventions.",

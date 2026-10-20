@@ -200,6 +200,17 @@
     "speedOptionLabel": "Reproducir a {rate}× de velocidad",
     "speedNote": "Material acelerado 3×: una inspección de cuatro minutos en 80 segundos. Use los botones de velocidad para ir aún más rápido."
   },
+  "CleaningExamples": {
+    "title": "Ejemplos de limpieza",
+    "subtitle": "Lo que encontramos dentro de los ductos antes de limpiarlos: fotos y video reales de trabajos con clientes.",
+    "items": {
+      "greaseDuct": "Ducto de extracción cubierto de grasa acumulada, antes de la limpieza.",
+      "dustFloor": "Polvo y residuos acumulados a lo largo del piso de un ducto de ventilación.",
+      "ductInterior": "Interior de un ducto antes de la limpieza: polvo, sedimento y manchas en todas sus paredes.",
+      "longRun": "Un tramo largo de ducto con mucho sedimento, inspeccionado antes de la limpieza.",
+      "ductCloseUp": "Acercamiento a la suciedad acumulada en el piso del ducto."
+    }
+  },
   "Videos": {
     "title": "Trabajo documentado",
     "subtitle": "Evidencia fotográfica de intervenciones reales.",
