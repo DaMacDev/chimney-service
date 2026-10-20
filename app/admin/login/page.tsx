@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@vodkadav/ui";
-import { SubmitButton } from "@/components/admin/SubmitButton";
+import { SubmitForm } from "@/components/admin/SubmitForm";
 import { getAdminEmail } from "@/lib/admin/auth";
 import { adminCopy } from "@/lib/admin/copy";
 
@@ -24,9 +24,9 @@ export default async function AdminLoginPage({ searchParams }: Props) {
             </p>
           )}
           {/* A plain GET form: the route redirects to Google, so this works without JS. */}
-          <form action="/admin/auth/login" method="get" className="mt-6">
-            <SubmitButton>{adminCopy.signIn}</SubmitButton>
-          </form>
+          <div className="mt-6">
+            <SubmitForm action="/admin/auth/login" method="get" label={adminCopy.signIn} />
+          </div>
         </div>
       </div>
     </AppShell>

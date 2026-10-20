@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell, ScrollRegion } from "@vodkadav/ui";
 import { ImagePlus } from "lucide-react";
-import { SubmitButton } from "@/components/admin/SubmitButton";
+import { SubmitForm } from "@/components/admin/SubmitForm";
 import { requireAdmin } from "@/lib/admin/auth";
 import { adminCopy } from "@/lib/admin/copy";
 
@@ -22,9 +22,12 @@ export default async function AdminPage() {
         <Link href="/es/gallery" className="text-accent-strong underline underline-offset-4">
           {adminCopy.viewSite}
         </Link>
-        <form action="/admin/auth/logout" method="post">
-          <SubmitButton variant="secondary">{adminCopy.signOut}</SubmitButton>
-        </form>
+        <SubmitForm
+          action="/admin/auth/logout"
+          method="post"
+          label={adminCopy.signOut}
+          variant="secondary"
+        />
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Google } from "arctic";
 import { siteOrigin } from "@/lib/site-url";
-import { SESSION_COOKIE, verifySession } from "./session";
+import { SESSION_COOKIE, isAllowedEmail, verifySession } from "./session";
 
 /** Server-only env for the owner login. Throws early so a misconfigured deploy fails loudly. */
 function requireEnv(name: string): string {
@@ -25,10 +25,14 @@ export function googleClient(): Google {
 
 export const secureCookies = process.env.NODE_ENV === "production";
 
-/** The signed-in owner's email, or null. */
+/**
+ * The signed-in owner's email, or null. Re-checks the allowlist so removing an
+ * address from ADMIN_EMAILS revokes its live sessions immediately.
+ */
 export async function getAdminEmail(): Promise<string | null> {
   const store = await cookies();
-  return verifySession(store.get(SESSION_COOKIE)?.value, authSecret());
+  const email = await verifySession(store.get(SESSION_COOKIE)?.value, authSecret());
+  return email && isAllowedEmail(email, process.env.ADMIN_EMAILS) ? email : null;
 }
 
 /**
