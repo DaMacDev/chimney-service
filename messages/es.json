@@ -178,6 +178,7 @@
     "prev": "Imagen anterior",
     "next": "Imagen siguiente",
     "goToImage": "Ir a la imagen {number}",
+    "adminEdit": "Editar galería",
     "captions": {
       "cameraInspection": "Inspección de ductos con cámara (video boroscopio).",
       "mechanicalRoom": "Limpieza de extracción de grasas en casa de máquinas.",

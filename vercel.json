@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "git config --global url.\"https://x-access-token:${VODKADAV_UI_TOKEN}@github.com/DaMacDev/vodkadav-ui\".insteadOf \"ssh://git@github.com/DaMacDev/vodkadav-ui\" && npm ci"
+}

@@ -178,6 +178,7 @@
     "prev": "Previous image",
     "next": "Next image",
     "goToImage": "Go to image {number}",
+    "adminEdit": "Edit gallery",
     "captions": {
       "cameraInspection": "Camera duct inspection (video borescope).",
       "mechanicalRoom": "Grease-extraction cleaning in a machine room.",

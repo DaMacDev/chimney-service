@@ -9,6 +9,7 @@ import { GalleryCarousel } from "@/components/features/GalleryCarousel";
 import { BeforeAfterVideo } from "@/components/sections/BeforeAfterVideo";
 import { CleaningExamples } from "@/components/sections/CleaningExamples";
 import { CtaBand } from "@/components/sections/CtaBand";
+import { AdminEditLink } from "@/components/features/AdminEditLink";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -31,6 +32,9 @@ export default async function GalleryPage({ params }: Props) {
     <main>
       <PageHeader title={t("title")} subtitle={t("subtitle")} />
       <section className="mx-auto max-w-6xl px-6 py-16">
+        <div className="mx-auto mb-4 flex max-w-4xl justify-end empty:hidden">
+          <AdminEditLink />
+        </div>
         <GalleryCarousel />
       </section>
       <CleaningExamples />

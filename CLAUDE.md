@@ -14,7 +14,11 @@ EN+ES+DA set)
 
 - **All user-facing copy** lives in `messages/en.json` + `messages/es.json`. Keys
   must stay in parity (enforced by `messages/messages.test.ts`). No hardcoded
-  strings in components.
+  strings in components. Exception: the Spanish-only owner tool under `/admin`
+  keeps its copy in `lib/admin/copy.ts` and its controls on `@vodkadav/ui`
+  (ADR 0002).
+- **Lockfile:** regenerate `package-lock.json` under Linux/WSL after dependency
+  changes; npm on Windows drops Linux-only optional peers and CI's `npm ci` fails.
 - **Brand & contact** in `data/site.ts`; **content structure** (services,
   features, stats, gallery, videos, testimonials) in the other `data/*.ts`.
 - **TDD** for interactive components (carousel, contact form, YouTube facade,
