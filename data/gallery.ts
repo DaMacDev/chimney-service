@@ -48,3 +48,51 @@ export const cleaningVideo: CleaningVideo = {
   afterSrc: "/videos/after-cleaning.mp4",
   afterPoster: "/videos/after-cleaning-poster.jpg",
 };
+
+/**
+ * "Cleaning examples" on the gallery page: the client's own inspection photos and
+ * clips of ducts before cleaning, shown at their natural shape (portrait phone
+ * footage would crop badly in the 16:10 carousel). Text resolves to messages →
+ * CleaningExamples.items.<key>. Clips are real time, audio stripped.
+ */
+export type CleaningExample =
+  | { kind: "video"; key: string; src: string; poster: string; portrait: boolean }
+  | { kind: "image"; key: string; src: string; width: number; height: number };
+
+export const cleaningExamples: CleaningExample[] = [
+  {
+    kind: "video",
+    key: "greaseDuct",
+    src: "/videos/cleaning-example-1.mp4",
+    poster: "/videos/cleaning-example-1-poster.jpg",
+    portrait: false,
+  },
+  {
+    kind: "video",
+    key: "dustFloor",
+    src: "/videos/cleaning-example-2.mp4",
+    poster: "/videos/cleaning-example-2-poster.jpg",
+    portrait: true,
+  },
+  {
+    kind: "image",
+    key: "ductInterior",
+    src: "/photos/duct-interior-1.jpg",
+    width: 1203,
+    height: 1600,
+  },
+  {
+    kind: "video",
+    key: "longRun",
+    src: "/videos/cleaning-example-3.mp4",
+    poster: "/videos/cleaning-example-3-poster.jpg",
+    portrait: true,
+  },
+  {
+    kind: "image",
+    key: "ductCloseUp",
+    src: "/photos/duct-interior-2.jpg",
+    width: 720,
+    height: 1600,
+  },
+];

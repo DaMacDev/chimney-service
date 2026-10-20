@@ -7,6 +7,7 @@ import { pageMetadata } from "@/lib/metadata";
 import { PageHeader } from "@/components/sections/PageHeader";
 import { GalleryCarousel } from "@/components/features/GalleryCarousel";
 import { BeforeAfterVideo } from "@/components/sections/BeforeAfterVideo";
+import { CleaningExamples } from "@/components/sections/CleaningExamples";
 import { CtaBand } from "@/components/sections/CtaBand";
 
 type Props = { params: Promise<{ locale: string }> };
@@ -32,6 +33,7 @@ export default async function GalleryPage({ params }: Props) {
       <section className="mx-auto max-w-6xl px-6 py-16">
         <GalleryCarousel />
       </section>
+      <CleaningExamples />
       <BeforeAfterVideo />
       <CtaBand />
     </main>
