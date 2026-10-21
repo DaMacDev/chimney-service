@@ -1,6 +1,11 @@
 import { siteConfig } from "@/data/site";
 import { siteOrigin } from "@/lib/site-url";
 
+/** JSON for an inline script: `<` escaped so no value can close the tag. */
+export function scriptJson(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c");
+}
+
 // No street/postal address or social profiles exist yet: address carries only
 // the country, sameAs is omitted. Add them when the client supplies real ones.
 export function JsonLd() {
@@ -19,7 +24,7 @@ export function JsonLd() {
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{
-        __html: JSON.stringify(data).replace(/</g, "\u003c"),
+        __html: scriptJson(data),
       }}
     />
   );

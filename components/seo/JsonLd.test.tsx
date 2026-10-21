@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { siteConfig } from "@/data/site";
-import { JsonLd } from "./JsonLd";
+import { JsonLd, scriptJson } from "./JsonLd";
 
 function read() {
   render(<JsonLd />);
@@ -26,5 +26,12 @@ describe("JsonLd", () => {
 
   it("never emits a raw < in the script body", () => {
     expect(read().raw).not.toContain("<");
+  });
+
+  it("escapes a value that tries to close the script tag, and still parses back", () => {
+    const evil = { name: "</script><script>alert(1)</script>" };
+    const out = scriptJson(evil);
+    expect(out).not.toContain("<");
+    expect(JSON.parse(out)).toEqual(evil);
   });
 });
