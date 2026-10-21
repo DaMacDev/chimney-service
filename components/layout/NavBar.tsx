@@ -24,8 +24,7 @@ export function NavBar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
     <header
@@ -37,7 +36,12 @@ export function NavBar() {
       )}
     >
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <Link href="/" aria-label={t("brand")} onClick={() => setOpen(false)}>
+        <Link
+          href="/"
+          aria-label={t("brand")}
+          onClick={() => setOpen(false)}
+          className="border-border-subtle bg-surface/80 rounded-full border py-1 pr-4 pl-1 shadow-sm backdrop-blur-md"
+        >
           <Logo />
         </Link>
 
