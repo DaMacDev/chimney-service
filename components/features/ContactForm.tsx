@@ -140,6 +140,7 @@ export function ContactForm({ accessKey = web3formsKey }: { accessKey?: string }
       <Button type="submit" size="lg" disabled={status === "sending"} className="w-full">
         {status === "sending" ? t("sending") : t("send")}
       </Button>
+      <p className="text-muted text-xs">{t("privacyNote")}</p>
     </form>
   );
 }

@@ -274,7 +274,8 @@
     "orEmail": "O escríbanos a",
     "invalidName": "Por favor ingrese su nombre.",
     "invalidEmail": "Por favor ingrese un correo electrónico válido.",
-    "invalidMessage": "Por favor describa brevemente su necesidad (al menos 10 caracteres)."
+    "invalidMessage": "Por favor describa brevemente su necesidad (al menos 10 caracteres).",
+    "privacyNote": "Solo usamos sus datos para responder a su solicitud — nunca se comparten ni se añaden a listas de correo."
   },
   "Cta": {
     "title": "¿Listo para una inspección técnica?",
@@ -293,5 +294,8 @@
     "followTitle": "Contáctenos",
     "serviceArea": "Cancún · Mérida · Península de Yucatán",
     "builtNote": "Cancún · Mérida · Servicio técnico industrial"
+  },
+  "A11y": {
+    "skipToContent": "Saltar al contenido"
   }
 }

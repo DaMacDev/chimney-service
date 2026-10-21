@@ -25,6 +25,11 @@ async function fillValid() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("ContactForm", () => {
+  it("shows the privacy note", () => {
+    renderForm();
+    expect(screen.getByText(/never shared or added to a mailing list/)).toBeInTheDocument();
+  });
+
   it("shows validation errors and does not submit when empty", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
