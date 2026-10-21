@@ -70,10 +70,7 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
 
   return (
-    <html
-      lang={locale}
-      className={`${inter.variable} ${fraunces.variable} h-full antialiased`}
-    >
+    <html lang={locale} className={`${inter.variable} ${fraunces.variable} h-full antialiased`}>
       <body className="bg-background text-foreground flex min-h-full flex-col">
         <SiteBackground />
         <NextIntlClientProvider>

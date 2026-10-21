@@ -16,8 +16,7 @@ const headingVariants = cva("font-display font-bold tracking-tight text-balance"
 type HeadingElement = "h1" | "h2" | "h3" | "h4";
 
 export interface HeadingProps
-  extends React.HTMLAttributes<HTMLHeadingElement>,
-    VariantProps<typeof headingVariants> {
+  extends React.HTMLAttributes<HTMLHeadingElement>, VariantProps<typeof headingVariants> {
   as?: HeadingElement;
 }
 

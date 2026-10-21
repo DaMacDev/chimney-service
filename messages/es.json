@@ -178,39 +178,21 @@
     "prev": "Imagen anterior",
     "next": "Imagen siguiente",
     "goToImage": "Ir a la imagen {number}",
-    "adminEdit": "Editar galería",
-    "captions": {
-      "cameraInspection": "Inspección de ductos con cámara (video boroscopio).",
-      "mechanicalRoom": "Limpieza de extracción de grasas en casa de máquinas.",
-      "ductMotor": "Servicio a un extractor industrial en azotea.",
-      "rooftopDuctwork": "Ductería de ventilación industrial en azotea.",
-      "rooftopTech": "Técnico equipado con EPP durante el servicio.",
-      "teamRooftop": "Nuestro equipo en sitio, listo para intervenir."
-    }
+    "mediaFallback": "Foto de la galería {number}",
+    "adminEdit": "Editar galería"
   },
   "VideoDemo": {
     "title": "Ejemplo en video de la limpieza",
     "subtitle": "Vea la diferencia que hace una intervención profesional: material real de uno de nuestros trabajos de limpieza de ductos.",
     "before": "Antes",
     "after": "Después",
-    "beforeCaption": "Ducto de extracción muy saturado de grasa y hollín, antes de nuestra intervención.",
-    "afterPlaceholder": "Video del después próximamente",
-    "afterCaption": "El mismo ducto después de nuestra intervención de limpieza de ductos.",
     "speedLabel": "Velocidad",
     "speedOption": "{rate}×",
-    "speedOptionLabel": "Reproducir a {rate}× de velocidad",
-    "speedNote": "Material acelerado 3×: una inspección de cuatro minutos en 80 segundos. Use los botones de velocidad para ir aún más rápido."
+    "speedOptionLabel": "Reproducir a {rate}× de velocidad"
   },
   "CleaningExamples": {
     "title": "Ejemplos de limpieza",
-    "subtitle": "Lo que encontramos dentro de los ductos antes de limpiarlos: fotos y video reales de trabajos con clientes.",
-    "items": {
-      "greaseDuct": "Ducto de extracción cubierto de grasa acumulada, antes de la limpieza.",
-      "dustFloor": "Polvo y residuos acumulados a lo largo del piso de un ducto de ventilación.",
-      "ductInterior": "Interior de un ducto antes de la limpieza: polvo, sedimento y manchas en todas sus paredes.",
-      "longRun": "Un tramo largo de ducto con mucho sedimento, inspeccionado antes de la limpieza.",
-      "ductCloseUp": "Acercamiento a la suciedad acumulada en el piso del ducto."
-    }
+    "subtitle": "Lo que encontramos dentro de los ductos antes de limpiarlos: fotos y video reales de trabajos con clientes."
   },
   "Videos": {
     "title": "Trabajo documentado",

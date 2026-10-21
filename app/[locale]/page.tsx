@@ -11,11 +11,13 @@ import { Process } from "@/components/sections/Process";
 import { GalleryTeaser } from "@/components/sections/GalleryTeaser";
 import { Equipment } from "@/components/sections/Equipment";
 import { CtaBand } from "@/components/sections/CtaBand";
+import { getGallery } from "@/lib/media/gallery";
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
+  const gallery = await getGallery(locale);
 
   return (
     <main>
@@ -25,7 +27,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <Features />
       <Sectors />
       <Process />
-      <GalleryTeaser />
+      <GalleryTeaser items={gallery.carousel} />
       <Equipment />
       <CtaBand />
     </main>

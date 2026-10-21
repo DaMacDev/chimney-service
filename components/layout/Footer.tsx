@@ -28,9 +28,15 @@ export function Footer() {
         </div>
 
         <nav className="flex flex-col gap-3" aria-label={t("quickLinksTitle")}>
-          <p className="text-foreground font-display text-sm font-semibold">{t("quickLinksTitle")}</p>
+          <p className="text-foreground font-display text-sm font-semibold">
+            {t("quickLinksTitle")}
+          </p>
           {NAV_LINKS.map(({ href, key }) => (
-            <Link key={key} href={href} className="text-muted hover:text-accent text-sm transition-colors">
+            <Link
+              key={key}
+              href={href}
+              className="text-muted hover:text-accent text-sm transition-colors"
+            >
               {tn(key)}
             </Link>
           ))}

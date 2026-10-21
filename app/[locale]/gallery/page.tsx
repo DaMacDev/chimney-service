@@ -10,6 +10,7 @@ import { BeforeAfterVideo } from "@/components/sections/BeforeAfterVideo";
 import { CleaningExamples } from "@/components/sections/CleaningExamples";
 import { CtaBand } from "@/components/sections/CtaBand";
 import { AdminEditLink } from "@/components/features/AdminEditLink";
+import { getGallery } from "@/lib/media/gallery";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -27,6 +28,7 @@ export default async function GalleryPage({ params }: Props) {
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
   const t = await getTranslations("Gallery");
+  const gallery = await getGallery(locale);
 
   return (
     <main>
@@ -35,10 +37,10 @@ export default async function GalleryPage({ params }: Props) {
         <div className="mx-auto mb-4 flex max-w-4xl justify-end empty:hidden">
           <AdminEditLink />
         </div>
-        <GalleryCarousel />
+        <GalleryCarousel slides={gallery.carousel} />
       </section>
-      <CleaningExamples />
-      <BeforeAfterVideo />
+      <CleaningExamples items={gallery.examples} />
+      <BeforeAfterVideo pair={gallery.pairs[0]} />
       <CtaBand />
     </main>
   );

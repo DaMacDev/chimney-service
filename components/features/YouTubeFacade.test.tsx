@@ -5,7 +5,11 @@ import { YouTubeFacade } from "./YouTubeFacade";
 
 function renderFacade() {
   return render(
-    <YouTubeFacade videoId="abc123" title="Resort chimney" playLabel="Play video: Resort chimney" />,
+    <YouTubeFacade
+      videoId="abc123"
+      title="Resort chimney"
+      playLabel="Play video: Resort chimney"
+    />,
   );
 }
 

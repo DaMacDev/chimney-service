@@ -59,7 +59,19 @@ and in a gitignored `.env.local`, never in the repo.
    `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
 3. `AUTH_SECRET` → output of `openssl rand -base64 48`.
 4. `ADMIN_EMAILS` → the owner's Google address (comma-separate extras).
-5. Redeploy. Sign in at `/admin`.
+5. **Media bucket (Cloudflare R2).** Enable R2 on the Cloudflare account, then:
+   ```powershell
+   npx wrangler@4 login
+   npx wrangler@4 r2 bucket create nuevo-amanecer-media
+   npx wrangler@4 r2 bucket dev-url enable nuevo-amanecer-media
+   ```
+   CORS must allow `GET, PUT, HEAD` with header `content-type` from the live
+   origin and `http://localhost:3000` (`wrangler r2 bucket cors set`). Create an
+   R2 API token (Object Read & Write, this bucket only) and set
+   `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and
+   `NEXT_PUBLIC_MEDIA_BASE_URL` (the printed `r2.dev` URL) for Production and
+   Preview.
+6. Redeploy. Sign in at `/admin`.
 
 ---
 
