@@ -22,7 +22,7 @@ const CLASS_B = new Set([
   "GetBucketLifecycleConfiguration",
 ]);
 
-const FREE_OPS = new Set(["DeleteObject", "DeleteBucket", "AbortMultipartUpload", "DeleteObjects"]);
+const FREE_OPS = new Set(["DeleteObject", "DeleteBucket", "AbortMultipartUpload"]);
 
 /** Unknown action types count as Class A, the stricter limit. */
 export function classify(actionType: string): "classA" | "classB" | "free" {

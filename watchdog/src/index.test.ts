@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { check, type Env } from "./index";
+import worker, { check, type Env } from "./index";
 import { FREE_TIER } from "./usage";
 
 const env: Env = {
@@ -81,5 +81,40 @@ describe("watchdog check", () => {
       vi.fn(async () => Response.json({ errors: [{ message: "no access" }] })),
     );
     await expect(check(env)).rejects.toThrow("analytics query failed");
+  });
+
+  it("still reports a kill switch that failed, then throws", async () => {
+    const titles: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.endsWith("/graphql")) return Response.json(analytics(FREE_TIER.classB * 0.95));
+        if (url.endsWith("/domains/managed")) return new Response("forbidden", { status: 403 });
+        if (url.includes("/search/issues")) return Response.json({ total_count: 0 });
+        titles.push(JSON.parse(String(init?.body)).title);
+        return new Response("{}", { status: 201 });
+      }),
+    );
+    await expect(check(env)).rejects.toThrow("disabling r2.dev failed");
+    expect(titles).toEqual([expect.stringContaining("kill switch FAILED")]);
+  });
+});
+
+describe("scheduled run", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("opens a 'watchdog failing' issue when the check throws", async () => {
+    const titles: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.endsWith("/graphql")) return new Response("bad gateway", { status: 502 });
+        if (url.includes("/search/issues")) return Response.json({ total_count: 0 });
+        titles.push(JSON.parse(String(init?.body)).title);
+        return new Response("{}", { status: 201 });
+      }),
+    );
+    await expect(worker.scheduled(undefined, env)).rejects.toThrow();
+    expect(titles).toEqual([expect.stringContaining("R2 watchdog failing")]);
   });
 });

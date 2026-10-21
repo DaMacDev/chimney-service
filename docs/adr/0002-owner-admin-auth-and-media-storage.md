@@ -27,7 +27,7 @@ monthly cost. There is exactly one editor.
 - **Never pay for R2 (owner requirement).** Cloudflare has no spending cap, so:
   admin uploads enforce a 5 GB total budget plus per-file and daily caps; media
   is content-hashed and cached forever, videos don't preload, and the manifest
-  is read per build, not per visitor; an hourly Cloudflare Worker
+  is read per build, not per visitor; a Cloudflare Worker running every 10 min
   (`watchdog/`, #12) sums month-to-date usage across the account, opens a
   GitHub issue at 50% of any free limit and switches off the bucket's public
   r2.dev URL at 90%.
@@ -41,6 +41,6 @@ monthly cost. There is exactly one editor.
 - No server-side video transcoding: the owner must keep clips under the cap.
 - When the watchdog trips, gallery media stops loading until the 1st of the
   next month or a manual `wrangler r2 bucket dev-url enable`. Analytics lag a
-  few minutes and checks are hourly, so the stop lands a little past 90%.
+  few minutes and checks run every 10 min, so the stop lands a little past 90%.
 - A lockfile written on Windows misses Linux-only optional peers; regenerate it
   under Linux/WSL after dependency changes.

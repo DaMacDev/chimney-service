@@ -1,5 +1,5 @@
 /**
- * Hourly R2 free-tier watchdog (issue #12, ADR 0002). Reads month-to-date usage
+ * Every-10-minutes R2 free-tier watchdog (issue #12, ADR 0002). Reads month-to-date usage
  * for the whole account; at 50% of any free limit opens a GitHub issue, at 90%
  * also switches off the media bucket's public r2.dev URL so reads stop before
  * they can be billed. One issue per level per month.
@@ -96,44 +96,74 @@ async function github(env: Env, path: string, init?: RequestInit): Promise<Respo
   });
 }
 
-/** Opens the month's issue for this level unless one already exists. */
-async function alertOnce(env: Env, lvl: Exclude<Level, "ok">, usage: Usage, now: Date) {
-  const month = now.toISOString().slice(0, 7);
-  const title =
-    lvl === "kill"
-      ? `R2 kill switch: public media switched off at 90% of free tier (${month})`
-      : `R2 usage at 50% of free tier (${month})`;
+/** Opens an issue with this exact title unless one already exists. */
+export async function openIssueOnce(env: Env, title: string, body: string): Promise<void> {
   const q = encodeURIComponent(`repo:${env.GITHUB_REPO} is:issue in:title "${title}"`);
   const search = await github(env, `/search/issues?q=${q}`);
   if (!search.ok) throw new Error(`GitHub search failed: ${search.status}`);
   if (((await search.json()) as { total_count: number }).total_count > 0) return;
 
-  const action =
-    lvl === "kill"
-      ? `The public media URL of \`${env.BUCKET}\` was switched off, so gallery photos and videos no longer load and no further reads can be billed. Usage resets on the 1st (UTC). To turn it back on:\n\n\`\`\`powershell\nnpx wrangler@4 r2 bucket dev-url enable ${env.BUCKET}\n\`\`\``
-      : `Nothing was switched off. At 90% the watchdog disables the bucket's public URL.`;
   const res = await github(env, `/repos/${env.GITHUB_REPO}/issues`, {
     method: "POST",
-    body: JSON.stringify({
-      title,
-      body: `${action}\n\nMonth-to-date, whole account:\n\n${report(usage)}`,
-    }),
+    body: JSON.stringify({ title, body }),
   });
   if (!res.ok) throw new Error(`GitHub issue failed: ${res.status} ${await res.text()}`);
 }
 
+const reenable = (bucket: string) =>
+  `\`\`\`powershell\nnpx wrangler@4 r2 bucket dev-url enable ${bucket}\n\`\`\``;
+
 export async function check(env: Env, now = new Date()): Promise<Level> {
   const usage = await readUsage(env, now);
   const lvl = level(usage);
-  if (lvl === "kill") await disablePublicUrl(env);
-  if (lvl !== "ok") await alertOnce(env, lvl, usage, now);
+  const month = now.toISOString().slice(0, 7);
+  const table = `Month-to-date, whole account:\n\n${report(usage)}`;
+
+  if (lvl === "kill") {
+    // Kill first, alert second, so a GitHub outage can never delay the kill; a
+    // failed kill is still reported, then rethrown.
+    let killError: unknown;
+    try {
+      await disablePublicUrl(env);
+    } catch (err) {
+      killError = err;
+    }
+    const action = killError
+      ? `**Switching off the public media URL FAILED:** ${String(killError)}\n\nSwitch it off by hand now:\n\n\`\`\`powershell\nnpx wrangler@4 r2 bucket dev-url disable ${env.BUCKET}\n\`\`\``
+      : `The public media URL of \`${env.BUCKET}\` was switched off, so gallery photos and videos no longer load and no further reads can be billed. Usage resets on the 1st (UTC). To turn it back on:\n\n${reenable(env.BUCKET)}`;
+    await openIssueOnce(
+      env,
+      killError
+        ? `R2 kill switch FAILED at 90% of free tier (${month})`
+        : `R2 kill switch: public media switched off at 90% of free tier (${month})`,
+      `${action}\n\n${table}`,
+    );
+    if (killError) throw killError;
+  } else if (lvl === "warn") {
+    await openIssueOnce(
+      env,
+      `R2 usage at 50% of free tier (${month})`,
+      `Nothing was switched off. At 90% the watchdog disables the bucket's public URL.\n\n${table}`,
+    );
+  }
   console.log(JSON.stringify({ level: lvl, ...usage }));
   return lvl;
 }
 
 const worker = {
   async scheduled(_controller: unknown, env: Env): Promise<void> {
-    await check(env);
+    try {
+      await check(env);
+    } catch (err) {
+      // A broken watchdog is no protection: say so once a day, then fail the run.
+      const day = new Date().toISOString().slice(0, 10);
+      await openIssueOnce(
+        env,
+        `R2 watchdog failing (${day})`,
+        `The usage check threw, so R2 usage is currently unguarded:\n\n\`\`\`\n${String(err)}\n\`\`\`\n\nCommon causes: an expired \`CF_API_TOKEN\` or \`GITHUB_TOKEN\`. Logs: \`npx wrangler@4 tail r2-watchdog\`.`,
+      );
+      throw err;
+    }
   },
 };
 
