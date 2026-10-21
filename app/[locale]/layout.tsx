@@ -10,6 +10,7 @@ import { siteOrigin } from "@/lib/site-url";
 import { NavBar } from "@/components/layout/NavBar";
 import { Footer } from "@/components/layout/Footer";
 import { SiteBackground } from "@/components/ui/site-background";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 export const viewport: Viewport = {
   themeColor: "#faf7f2",
@@ -75,6 +76,7 @@ export default async function LocaleLayout({
       className={`${inter.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="bg-background text-foreground flex min-h-full flex-col">
+        <JsonLd />
         <SiteBackground />
         <NextIntlClientProvider>
           <NavBar />
