@@ -11,6 +11,7 @@ import { NavBar } from "@/components/layout/NavBar";
 import { Footer } from "@/components/layout/Footer";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { SiteBackground } from "@/components/ui/site-background";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 export const viewport: Viewport = {
   themeColor: "#faf7f2",
@@ -80,6 +81,7 @@ export default async function LocaleLayout({
         >
           {a11y("skipToContent")}
         </a>
+        <JsonLd />
         <SiteBackground />
         <NextIntlClientProvider>
           <NavBar />
