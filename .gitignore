@@ -57,3 +57,7 @@ next-env.d.ts
 .claude/worktrees/
 .claude/decisions/
 .claude/sentinel-reports/
+
+# Wrangler (R2 watchdog) local secrets and state
+.dev.vars
+.wrangler/
