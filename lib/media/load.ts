@@ -16,7 +16,9 @@ export async function loadManifest(): Promise<Manifest> {
   try {
     const res = await fetch(`${mediaBaseUrl.replace(/\/+$/, "")}/manifest.json`, {
       cache: "force-cache",
-      next: { tags: [MEDIA_TAG] },
+      // Daily refresh is only a safety net (a build that caught R2 down would
+      // otherwise stay empty until the next save): ~120 reads/month.
+      next: { tags: [MEDIA_TAG], revalidate: 86400 },
     });
     if (!res.ok) return EMPTY_MANIFEST;
     return parseManifest(await res.json()) ?? EMPTY_MANIFEST;

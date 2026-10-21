@@ -16,7 +16,7 @@ export interface MediaFile {
   width: number;
   height: number;
   bytes: number;
-  /** Video only: still frame shown before playback. */
+  /** Video only, and required for video: still frame shown before playback. */
   poster?: string;
 }
 
@@ -89,7 +89,10 @@ function isFile(v: unknown): v is MediaFile {
     KEY_PATTERN.test(v.key) &&
     (v.kind === "image" || v.kind === "video") &&
     [v.width, v.height, v.bytes].every((n) => typeof n === "number" && n > 0) &&
-    (v.poster === undefined || (typeof v.poster === "string" && KEY_PATTERN.test(v.poster)))
+    // Videos need a poster: with preload="none" there is no first frame to show.
+    (v.kind === "video"
+      ? typeof v.poster === "string" && KEY_PATTERN.test(v.poster)
+      : v.poster === undefined)
   );
 }
 

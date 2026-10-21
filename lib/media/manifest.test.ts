@@ -36,6 +36,10 @@ describe("parseManifest", () => {
     ["bad text", manifest({ carousel: [{ id: "a", file: image, caption: { en: "no es" } }] })],
     ["zero size", manifest({ examples: [{ id: "b", file: { ...video, bytes: 0 } }] })],
     ["pair missing after", manifest({ pairs: [{ id: "c", before: { file: video } }] })],
+    [
+      "video without poster",
+      manifest({ examples: [{ id: "b", file: { ...video, poster: undefined } }] }),
+    ],
   ])("rejects %s", (_label, input) => {
     expect(parseManifest(input)).toBeNull();
   });
