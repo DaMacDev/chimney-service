@@ -15,13 +15,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Otherwise checkout's repo-scoped auth header overrides the
+          # private-package token below and GitHub answers "not found".
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
 
+      # @vodkadav/ui is a private git dependency; a read-only token scoped to that
+      # one repo lets npm fetch it.
+      - name: Authorise private UI package
+        run: git config --global url."https://x-access-token:${VODKADAV_UI_TOKEN}@github.com/DaMacDev/vodkadav-ui".insteadOf "ssh://git@github.com/DaMacDev/vodkadav-ui"
+        env:
+          VODKADAV_UI_TOKEN: ${{ secrets.VODKADAV_UI_TOKEN }}
+
       - run: npm ci
+
+      # Drop the token so later steps (tests, build) can't read it.
+      - run: git config --global --remove-section url."https://x-access-token:${VODKADAV_UI_TOKEN}@github.com/DaMacDev/vodkadav-ui"
+        env:
+          VODKADAV_UI_TOKEN: ${{ secrets.VODKADAV_UI_TOKEN }}
 
       - name: Lint
         run: npm run lint

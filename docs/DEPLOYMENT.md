@@ -42,6 +42,27 @@ gates merges; Vercel handles the actual deploy via its Git integration.
 
 ---
 
+## 2b. Owner admin (`/admin`) — ~15 min, once
+
+See ADR 0002. All values are secrets: set them in Vercel (Production + Preview)
+and in a gitignored `.env.local`, never in the repo.
+
+1. **UI package token.** GitHub → Settings → Developer settings → Fine-grained
+   tokens → new token, repository access **only `DaMacDev/vodkadav-ui`**,
+   permission **Contents: Read-only**. Save it as `VODKADAV_UI_TOKEN` both as a
+   GitHub Actions secret on this repo and as a Vercel env var.
+2. **Google OAuth client.** console.cloud.google.com → APIs & Services →
+   OAuth consent screen (External, app name, your email) → Credentials →
+   Create OAuth client ID → Web application. Authorized redirect URIs:
+   `https://chimney-service-cancun.vercel.app/admin/auth/callback` and
+   `http://localhost:3000/admin/auth/callback`. Copy the ID and secret into
+   `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+3. `AUTH_SECRET` → output of `openssl rand -base64 48`.
+4. `ADMIN_EMAILS` → the owner's Google address (comma-separate extras).
+5. Redeploy. Sign in at `/admin`.
+
+---
+
 ## 3. Attach a paid custom domain (later, optional)
 
 1. Buy the domain from any registrar.
