@@ -280,7 +280,11 @@
     "title": "¿Listo para una inspección técnica?",
     "subtitle": "Únase a los hoteles, hospitales y centros que confían a Nuevo Amanecer el mantenimiento de sus instalaciones críticas.",
     "primary": "Solicitar inspección técnica",
-    "secondary": "Ver nuestros servicios"
+    "secondary": "Ver nuestros servicios",
+    "call": "¿Emergencias? Llámenos directamente:"
+  },
+  "WhatsAppFloat": {
+    "label": "Escríbenos por WhatsApp"
   },
   "LanguageSwitcher": {
     "label": "Cambiar idioma"
