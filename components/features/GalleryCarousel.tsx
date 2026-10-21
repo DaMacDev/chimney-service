@@ -4,16 +4,18 @@ import { useState, type KeyboardEvent } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { galleryImages } from "@/data/gallery";
+import type { ViewMedia } from "@/lib/media/view";
 import { cn } from "@/lib/utils";
 
-export function GalleryCarousel() {
+export function GalleryCarousel({ slides }: { slides: ViewMedia[] }) {
   const t = useTranslations("Gallery");
   const [index, setIndex] = useState(0);
-  const count = galleryImages.length;
+  const count = slides.length;
+
+  if (count === 0) return null;
 
   const go = (to: number) => setIndex(((to % count) + count) % count);
-  const current = galleryImages[index];
+  const current = slides[index];
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "ArrowLeft") go(index - 1);
@@ -30,11 +32,13 @@ export function GalleryCarousel() {
       onKeyDown={onKeyDown}
     >
       <div className="border-border-subtle bg-surface relative aspect-[16/10] overflow-hidden rounded-3xl border shadow-[0_30px_80px_-40px_rgba(33,26,21,0.45)]">
+        {/* Served straight from R2, not via Vercel's optimizer (Hobby quota). */}
         <Image
           key={current.src}
           src={current.src}
-          alt={t(`captions.${current.captionKey}`)}
+          alt={current.label}
           fill
+          unoptimized
           sizes="(max-width: 896px) 100vw, 896px"
           className="object-cover"
           priority
@@ -58,14 +62,22 @@ export function GalleryCarousel() {
         </button>
       </div>
 
-      <p aria-live="polite" className="text-foreground mt-5 text-center text-lg font-medium">
-        {t(`captions.${current.captionKey}`)}
-      </p>
+      <div aria-live="polite" className="mt-5 text-center">
+        {current.name && (
+          <p className="font-display text-foreground text-lg font-bold">{current.name}</p>
+        )}
+        {current.caption && (
+          <p className="text-foreground text-lg font-medium">{current.caption}</p>
+        )}
+        {current.description && (
+          <p className="text-muted mx-auto mt-1 max-w-2xl text-sm">{current.description}</p>
+        )}
+      </div>
 
       <div className="mt-4 flex flex-wrap justify-center gap-2">
-        {galleryImages.map((img, i) => (
+        {slides.map((slide, i) => (
           <button
-            key={img.src}
+            key={slide.id}
             type="button"
             onClick={() => go(i)}
             aria-label={t("goToImage", { number: i + 1 })}

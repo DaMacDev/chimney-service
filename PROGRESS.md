@@ -72,9 +72,15 @@ Mérida. Next.js 16 + next-intl + Tailwind v4, deployed on Vercel.
       averaged ~2.0 Mbps, so 4× demanded ~8 Mbps sustained; with `preload="metadata"`
       it never buffered far enough ahead and looped `waiting`/`playing`, advancing at
       ~1.35× and looking like the speed toggle was stuck. Fixed by the `-crf 31
-      -maxrate 1400k` re-encode above (887 kbps → whole clip buffers immediately).
+    -maxrate 1400k` re-encode above (887 kbps → whole clip buffers immediately).
       `SpeedVideo` also listens for `ratechange` now, so the browser's own speed menu
       can't leave the buttons showing a rate the video isn't playing at.
+- [x] **Owner media manager, part 1 (2026-10-21, ADR 0002):** owner Google sign-in
+      at `/admin` (allowlist `ADMIN_EMAILS`); gallery media + captions moved to the
+      Cloudflare R2 bucket `nuevo-amanecer-media` with a `manifest.json`
+      (`lib/media/`). The bundled gallery files above now live only in R2.
+- [ ] Owner media manager, part 2: R2 free-tier watchdog, admin uploads/edit,
+      before/after pair carousel (GitHub milestone "Owner media manager")
 - [ ] Site-review improvement pass (2026-07-11) — 2 hero-contrast fixes + JSON-LD,
       WhatsApp float, CTA phone, skip link, form privacy note. Sonnet-ready plan:
       `docs/IMPROVEMENT-PLAN.md`
@@ -131,7 +137,8 @@ Verify live any time: `curl -s -o /dev/null -w "%{http_code}" https://chimney-se
 ## Notes
 
 - Created 2026-06-21; reframed to Nuevo Amanecer the same day.
-- Real client job photos live in `public/photos/` (gallery/before-after/about);
+- Gallery media (carousel, cleaning examples, before/after) lives in R2 and is
+  owner-managed; other real client photos live in `public/photos/` (work/about);
   the hero + CTA band use locally-generated no-face AI imagery (`gen-*.png`, see
   `CREDITS.md`). Content is wired from `data/*.ts` + `messages/{en,es}.json`.
 - The Spanish client intake form (`docs/Formulario-de-Contenido.docx`) can still be

@@ -178,39 +178,21 @@
     "prev": "Previous image",
     "next": "Next image",
     "goToImage": "Go to image {number}",
-    "adminEdit": "Edit gallery",
-    "captions": {
-      "cameraInspection": "Camera duct inspection (video borescope).",
-      "mechanicalRoom": "Grease-extraction cleaning in a machine room.",
-      "ductMotor": "Servicing an industrial rooftop extractor.",
-      "rooftopDuctwork": "Industrial ventilation ductwork on a rooftop.",
-      "rooftopTech": "Technician in full PPE during service.",
-      "teamRooftop": "Our team on site, ready to intervene."
-    }
+    "mediaFallback": "Gallery photo {number}",
+    "adminEdit": "Edit gallery"
   },
   "VideoDemo": {
     "title": "Video example of cleaning",
     "subtitle": "See the difference a professional intervention makes — real footage from one of our duct-cleaning jobs.",
     "before": "Before",
     "after": "After",
-    "beforeCaption": "Extraction duct heavily saturated with grease and soot, before our intervention.",
-    "afterPlaceholder": "After footage coming soon",
-    "afterCaption": "The same duct after our extraction-duct cleaning intervention.",
     "speedLabel": "Speed",
     "speedOption": "{rate}×",
-    "speedOptionLabel": "Play at {rate}× speed",
-    "speedNote": "Footage accelerated 3× — a four-minute inspection in 80 seconds. Use the speed buttons to go faster still."
+    "speedOptionLabel": "Play at {rate}× speed"
   },
   "CleaningExamples": {
     "title": "Cleaning examples",
-    "subtitle": "What we find inside ducts before we clean them: real photos and footage from client jobs.",
-    "items": {
-      "greaseDuct": "Extraction duct coated in grease build-up, before cleaning.",
-      "dustFloor": "Dust and debris collected along the floor of a ventilation duct.",
-      "ductInterior": "Duct interior before cleaning: dust, sediment and stains on every wall.",
-      "longRun": "A long duct run with heavy sediment, inspected before cleaning.",
-      "ductCloseUp": "Close-up of the dirt accumulated on the duct floor."
-    }
+    "subtitle": "What we find inside ducts before we clean them: real photos and footage from client jobs."
   },
   "Videos": {
     "title": "Documented work",

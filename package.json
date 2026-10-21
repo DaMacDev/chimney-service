@@ -16,6 +16,7 @@
   "dependencies": {
     "@vodkadav/ui": "github:DaMacDev/vodkadav-ui#v0.1.0",
     "arctic": "3.7.0",
+    "aws4fetch": "1.0.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",

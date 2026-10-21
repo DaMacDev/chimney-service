@@ -1,7 +1,7 @@
 /**
  * Build an Unsplash CDN URL from a photo id. Images are referenced remotely
  * (configured in next.config.ts) rather than committed, so they are easy to
- * swap: replace the ids in data/gallery.ts with your own photo shoot.
+ * swap for your own photo shoot.
  *
  * Unsplash License: free for commercial use, no attribution required.
  */

@@ -15,22 +15,18 @@ interface SpeedVideoProps {
   caption: string;
   speedLabel: string;
   speedOptions: SpeedOption[];
-  /** Extra classes for the `<video>`, e.g. `aspect-[9/16]` for portrait footage. */
-  className?: string;
+  /** Width / height of the footage; defaults to 16:9. */
+  aspectRatio?: number;
 }
 
-/**
- * Self-hosted clip with playback-speed buttons. The before/after footage is already
- * encoded at 3x real time, so these multiply that again — see
- * `docs/reference-existing-site.md`.
- */
+/** Clip with playback-speed buttons, served from the R2 media bucket. */
 export function SpeedVideo({
   src,
   poster,
   caption,
   speedLabel,
   speedOptions,
-  className,
+  aspectRatio = 16 / 9,
 }: SpeedVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [rate, setRate] = useState(1);
@@ -47,7 +43,9 @@ export function SpeedVideo({
         controls
         muted
         playsInline
-        preload="metadata"
+        // "none": the poster covers the idle state, and each metadata fetch would
+        // be a billed R2 read per visitor (free-tier guardrail, ADR 0002).
+        preload="none"
         poster={poster}
         aria-label={caption}
         // A fresh source resets playbackRate, so re-apply once metadata lands.
@@ -59,9 +57,10 @@ export function SpeedVideo({
         onRateChange={() => {
           if (videoRef.current) setRate(videoRef.current.playbackRate);
         }}
-        className={cn("aspect-video w-full bg-black object-cover", className)}
+        style={{ aspectRatio }}
+        className="w-full bg-black object-cover"
       >
-        <source src={src} type="video/mp4" />
+        <source src={src} type={src.endsWith(".webm") ? "video/webm" : "video/mp4"} />
       </video>
 
       <div
