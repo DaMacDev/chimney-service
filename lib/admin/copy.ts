@@ -68,6 +68,34 @@ export const adminCopy = {
   loading: "Cargando…",
   loadError: "No se pudo cargar la galería. Revisa tu conexión e inténtalo de nuevo.",
   retry: "Reintentar",
+  movedTo: (position: number) => `Movido a la posición ${position}.`,
+  removed: "Elemento borrado.",
+
+  errors: {
+    denied: "Tu sesión expiró. Vuelve a iniciar sesión.",
+    conflict: "Otro cambio se guardó mientras tanto. Recarga la página e inténtalo de nuevo.",
+    notFound: "Este elemento ya no existe. Recarga la página.",
+    invalidData: "Los datos no son válidos.",
+    invalidRequest: "Petición no válida.",
+    carouselPhotosOnly: "El carrusel solo admite fotos.",
+    invalidType: "Tipo de archivo no válido.",
+    notUploaded: "El archivo no terminó de subirse. Inténtalo de nuevo.",
+    missingPoster: "Falta la imagen de portada del video.",
+    tooLong: (max: number) => `Máximo ${max} caracteres.`,
+    needSpanish: "Escribe también el texto en español.",
+    typeNotAllowed: "Tipo de archivo no permitido. Usa fotos JPG o PNG, o videos MP4, WebM o MOV.",
+    invalidFile: "Archivo inválido.",
+    emptyFile: "Archivo vacío o inválido.",
+    photoTooBig: "La foto pesa más de 10 MB.",
+    videoTooBig:
+      "El video pesa más de 50 MB. Acórtalo o envíalo por WhatsApp para comprimirlo y vuelve a intentarlo.",
+    dailyLimit: (max: number) => `Límite diario alcanzado (${max} archivos). Inténtalo mañana.`,
+    storageFull:
+      "Se alcanzó el espacio máximo (5 GB). Borra fotos o videos antiguos para subir más.",
+    unreadablePhoto: "No se pudo leer la foto. Prueba con un JPG o PNG.",
+    unplayableVideo:
+      "Este navegador no puede reproducir el video. Grábalo en formato «Más compatible» o envíalo por WhatsApp y vuelve a intentarlo.",
+  },
 } as const;
 
 export type AdminSectionSlug = keyof typeof adminCopy.sections;

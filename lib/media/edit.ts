@@ -2,6 +2,7 @@
  * Pure manifest edits used by the admin actions. Each returns a new manifest;
  * the caller validates and saves it.
  */
+import { adminCopy } from "@/lib/admin/copy";
 import { TEXT_LIMITS } from "./limits";
 import type { LocalText, Manifest, MediaFile, MediaItem } from "./manifest";
 
@@ -27,8 +28,8 @@ export function toLocalText(
   const es = input?.es?.trim() ?? "";
   const en = input?.en?.trim() ?? "";
   const max = TEXT_LIMITS[field];
-  if (es.length > max || en.length > max) return `Máximo ${max} caracteres.`;
-  if (!es && en) return "Escribe también el texto en español.";
+  if (es.length > max || en.length > max) return adminCopy.errors.tooLong(max);
+  if (!es && en) return adminCopy.errors.needSpanish;
   if (!es) return undefined;
   return en ? { es, en } : { es };
 }
@@ -55,7 +56,8 @@ export function updateItemTexts(
   section: ItemSection,
   id: string,
   texts: Pick<MediaItem, "name" | "caption" | "description">,
-): Manifest {
+): Manifest | string {
+  if (!manifest[section].some((item) => item.id === id)) return adminCopy.errors.notFound;
   return {
     ...manifest,
     [section]: manifest[section].map((item) =>
@@ -69,16 +71,22 @@ export function moveItem(
   section: ItemSection,
   id: string,
   direction: -1 | 1,
-): Manifest {
+): Manifest | string {
   const items = [...manifest[section]];
   const from = items.findIndex((item) => item.id === id);
+  if (from < 0) return adminCopy.errors.notFound;
   const to = from + direction;
-  if (from < 0 || to < 0 || to >= items.length) return manifest;
+  if (to < 0 || to >= items.length) return manifest;
   [items[from], items[to]] = [items[to], items[from]];
   return { ...manifest, [section]: items };
 }
 
-export function removeItem(manifest: Manifest, section: ItemSection, id: string): Manifest {
+export function removeItem(
+  manifest: Manifest,
+  section: ItemSection,
+  id: string,
+): Manifest | string {
+  if (!manifest[section].some((item) => item.id === id)) return adminCopy.errors.notFound;
   return { ...manifest, [section]: manifest[section].filter((item) => item.id !== id) };
 }
 

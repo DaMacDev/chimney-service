@@ -16,6 +16,7 @@ import {
 import { adminCopy } from "@/lib/admin/copy";
 import { prepareFile, type PreparedBlob } from "@/lib/admin/prepare-file";
 import type { ItemSection, ItemTexts, TextInput } from "@/lib/media/edit";
+import { MAX_VIDEO_BYTES } from "@/lib/media/limits";
 import type { MediaFile } from "@/lib/media/manifest";
 
 export interface ManagedItem {
@@ -89,23 +90,23 @@ function TextFields({
   );
 }
 
+/** Runs a Server Action; a thrown error (network, server crash) becomes the Spanish generic message. */
+async function call<T>(action: Promise<ActionResult<T>>): Promise<ActionResult<T>> {
+  return action.catch(() => ({ ok: false, error: adminCopy.genericError }));
+}
+
 /** Uploads one prepared blob through a presigned link; returns its object key. */
 async function uploadBlob(blob: PreparedBlob): Promise<string> {
-  const ticket = await prepareUpload({
-    sha256: blob.sha256,
-    contentType: blob.contentType,
-    bytes: blob.blob.size,
-  });
+  const ticket = await call(
+    prepareUpload({ sha256: blob.sha256, contentType: blob.contentType, bytes: blob.blob.size }),
+  );
   if (!ticket.ok) throw new Error(ticket.error);
   if (ticket.data.url) {
     // A network failure throws a raw TypeError; the owner gets the Spanish message.
     const res = await fetch(ticket.data.url, {
       method: "PUT",
       body: blob.blob,
-      headers: {
-        "content-type": blob.contentType,
-        "cache-control": "public, max-age=31536000, immutable",
-      },
+      headers: ticket.data.headers,
     }).catch(() => null);
     if (!res?.ok) throw new Error(adminCopy.uploadFailed);
   }
@@ -123,6 +124,7 @@ function AddForm({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [texts, setTexts] = useState<ItemTexts>(EMPTY_TEXTS);
+  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ tone: "info" | "error" | "ok"; text: string } | null>(
     null,
   );
@@ -130,6 +132,11 @@ function AddForm({
   async function submit() {
     const file = fileRef.current?.files?.[0];
     if (!file) return setStatus({ tone: "error", text: adminCopy.chooseFile });
+    // Before hashing: a multi-GB video would otherwise be read into memory first.
+    if (!file.type.startsWith("image/") && file.size > MAX_VIDEO_BYTES) {
+      return setStatus({ tone: "error", text: adminCopy.errors.videoTooBig });
+    }
+    setBusy(true);
     try {
       setStatus({ tone: "info", text: adminCopy.preparing });
       const prepared = await prepareFile(file);
@@ -138,18 +145,20 @@ function AddForm({
       const key = await uploadBlob(prepared.main);
       setStatus({ tone: "info", text: adminCopy.saving });
       const kind = prepared.poster ? "video" : "image";
-      const result = await addMedia({
-        section,
-        file: {
-          key,
-          kind,
-          width: prepared.main.width,
-          height: prepared.main.height,
-          bytes: prepared.main.blob.size,
-          ...(poster ? { poster } : {}),
-        },
-        texts,
-      });
+      const result = await call(
+        addMedia({
+          section,
+          file: {
+            key,
+            kind,
+            width: prepared.main.width,
+            height: prepared.main.height,
+            bytes: prepared.main.blob.size,
+            ...(poster ? { poster } : {}),
+          },
+          texts,
+        }),
+      );
       if (!result.ok) throw new Error(result.error);
       setTexts(EMPTY_TEXTS);
       if (fileRef.current) fileRef.current.value = "";
@@ -160,6 +169,8 @@ function AddForm({
         tone: "error",
         text: err instanceof Error ? err.message : adminCopy.genericError,
       });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -185,19 +196,16 @@ function AddForm({
         <p className="text-muted text-xs">{adminCopy.fileHelp}</p>
       </div>
       <TextFields idPrefix={`new-${section}`} value={texts} onChange={setTexts} />
-      {status && (
-        <p
-          role={status.tone === "error" ? "alert" : "status"}
-          className={
-            status.tone === "error"
-              ? "rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800"
-              : "text-muted text-sm"
-          }
-        >
+      {/* Kept mounted so screen readers announce changes to it. */}
+      <p role="status" className="text-muted text-sm empty:hidden">
+        {status && status.tone !== "error" ? status.text : ""}
+      </p>
+      {status?.tone === "error" && (
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {status.text}
         </p>
       )}
-      <Button variant="primary" onClick={submit}>
+      <Button variant="primary" onClick={submit} disabled={busy}>
         {adminCopy.upload}
       </Button>
     </section>
@@ -207,30 +215,42 @@ function AddForm({
 function ItemRow({
   section,
   item,
-  first,
+  index,
   last,
   onDone,
 }: {
   section: ItemSection;
   item: ManagedItem;
-  first: boolean;
+  index: number;
   last: boolean;
-  onDone: () => void;
+  onDone: (announcement?: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [texts, setTexts] = useState<ItemTexts>({
+  const saved: ItemTexts = {
     name: item.name,
     caption: item.caption,
     description: item.description,
-  });
+  };
+  const [editing, setEditing] = useState(false);
+  const [texts, setTexts] = useState<ItemTexts>(saved);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function run(action: () => Promise<ActionResult>) {
+  /** One action at a time: a double click must not move twice or delete twice. */
+  async function run(action: () => Promise<ActionResult>, announcement?: string) {
+    if (busy) return;
+    setBusy(true);
     setError(null);
-    const result = await action();
+    const result = await call(action());
+    setBusy(false);
     if (!result.ok) return setError(result.error);
-    onDone();
+    onDone(announcement);
   }
+
+  const move = (direction: -1 | 1) =>
+    run(
+      () => moveMedia({ section, id: item.id, direction }),
+      adminCopy.movedTo(index + 1 + direction),
+    );
 
   const title = item.name.es || item.caption.es || adminCopy.untitled;
 
@@ -253,7 +273,11 @@ function ItemRow({
         </div>
         {!editing && (
           <div className="flex shrink-0 items-center gap-1">
-            <Button size="sm" onClick={() => setEditing(true)}>
+            <Button
+              size="sm"
+              aria-label={`${adminCopy.edit}: ${title}`}
+              onClick={() => setEditing(true)}
+            >
               {adminCopy.edit}
             </Button>
             <OverflowMenu
@@ -263,24 +287,25 @@ function ItemRow({
                   id: "up",
                   label: adminCopy.moveUp,
                   icon: <ArrowUp className="size-4" aria-hidden />,
-                  disabled: first,
-                  onSelect: () => run(() => moveMedia({ section, id: item.id, direction: -1 })),
+                  disabled: busy || index === 0,
+                  onSelect: () => move(-1),
                 },
                 {
                   id: "down",
                   label: adminCopy.moveDown,
                   icon: <ArrowDown className="size-4" aria-hidden />,
-                  disabled: last,
-                  onSelect: () => run(() => moveMedia({ section, id: item.id, direction: 1 })),
+                  disabled: busy || last,
+                  onSelect: () => move(1),
                 },
                 {
                   id: "remove",
                   label: adminCopy.remove,
                   icon: <Trash2 className="size-4" aria-hidden />,
                   danger: true,
+                  disabled: busy,
                   onSelect: () =>
                     window.confirm(adminCopy.confirmRemove)
-                      ? run(() => deleteMedia({ section, id: item.id }))
+                      ? run(() => deleteMedia({ section, id: item.id }), adminCopy.removed)
                       : undefined,
                 },
               ]}
@@ -294,17 +319,24 @@ function ItemRow({
           <div className="flex gap-2">
             <Button
               variant="primary"
+              disabled={busy}
               onClick={() =>
                 run(async () => {
                   const result = await updateMedia({ section, id: item.id, texts });
                   if (result.ok) setEditing(false);
                   return result;
-                })
+                }, adminCopy.saved)
               }
             >
               {adminCopy.save}
             </Button>
-            <Button variant="ghost" onClick={() => setEditing(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setTexts(saved);
+                setEditing(false);
+              }}
+            >
               {adminCopy.cancel}
             </Button>
           </div>
@@ -322,6 +354,8 @@ function ItemRow({
 /**
  * One admin section: add form + ordered list. Scroll contract: this is the
  * screen's single bounded vertical ScrollRegion (AppShell pins the header).
+ * Ceiling: no paging and full-size thumbnails; fine for tens of items, add
+ * paging and resized thumbnails if a section grows into the hundreds.
  */
 export function MediaManager({
   section,
@@ -335,12 +369,19 @@ export function MediaManager({
   hint: string;
 }) {
   const router = useRouter();
-  const refresh = () => router.refresh();
+  const [announcement, setAnnouncement] = useState("");
+  const refresh = (message?: string) => {
+    setAnnouncement(message ?? "");
+    router.refresh();
+  };
 
   return (
     <ScrollRegion label={adminCopy.listRegion}>
       <div className="mx-auto grid max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[22rem_1fr] lg:items-start">
-        <AddForm section={section} accept={accept} onDone={refresh} />
+        <p role="status" className="sr-only">
+          {announcement}
+        </p>
+        <AddForm section={section} accept={accept} onDone={() => refresh()} />
         <div className="flex min-w-0 flex-col gap-3">
           <p className="text-muted text-sm">{hint}</p>
           {items.length === 0 ? (
@@ -355,7 +396,7 @@ export function MediaManager({
                   key={item.id}
                   section={section}
                   item={item}
-                  first={i === 0}
+                  index={i}
                   last={i === items.length - 1}
                   onDone={refresh}
                 />

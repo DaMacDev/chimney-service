@@ -1,6 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import { EMPTY_MANIFEST, parseManifest, type Manifest } from "./manifest";
-import type { BucketUsage } from "./limits";
+import { landedUsage, type DayLedger, type LandedUsage } from "./limits";
 
 /**
  * Server-side access to the R2 media bucket over its S3 API (admin only).
@@ -43,46 +43,86 @@ export interface StoredManifest {
   etag: string | null;
 }
 
-/** Uncached read for editing (the public site reads the cached copy). */
-export async function readManifest(): Promise<StoredManifest> {
-  const res = await r2(`${bucketUrl()}/manifest.json`);
-  if (res.status === 404) return { manifest: EMPTY_MANIFEST, etag: null };
-  if (!res.ok) throw new Error(`Reading manifest failed: ${res.status}`);
-  const manifest = parseManifest(await res.json());
-  if (!manifest) throw new Error("Stored manifest is invalid");
+export class ConflictError extends Error {}
+
+/** Uncached JSON read with its ETag; null json when the object doesn't exist. */
+async function readJson(key: string): Promise<{ json: unknown; etag: string | null }> {
+  const res = await r2(`${bucketUrl()}/${key}`);
+  if (res.status === 404) return { json: null, etag: null };
+  if (!res.ok) throw new Error(`Reading ${key} failed: ${res.status}`);
   // R2 gzips the JSON for fetch's Accept-Encoding and then marks the ETag weak
   // (W/"…"); If-Match compares strongly, so use the underlying strong value.
-  return { manifest, etag: res.headers.get("etag")?.replace(/^W\//, "") ?? null };
+  return { json: await res.json(), etag: res.headers.get("etag")?.replace(/^W\//, "") ?? null };
 }
 
-export class ConflictError extends Error {}
+/** Writes only if the object is unchanged since `etag` was read (null = must not exist yet). */
+async function writeJson(key: string, value: unknown, etag: string | null): Promise<void> {
+  const res = await r2(`${bucketUrl()}/${key}`, {
+    method: "PUT",
+    body: JSON.stringify(value, null, 2),
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-cache",
+      ...(etag ? { "if-match": etag } : { "if-none-match": "*" }),
+    },
+  });
+  if (res.status === 412) throw new ConflictError(`${key} changed since it was read`);
+  if (!res.ok) throw new Error(`Saving ${key} failed: ${res.status}`);
+}
+
+/** Uncached read for editing (the public site reads the cached copy). */
+export async function readManifest(): Promise<StoredManifest> {
+  const { json, etag } = await readJson("manifest.json");
+  if (json === null) return { manifest: EMPTY_MANIFEST, etag: null };
+  const manifest = parseManifest(json);
+  if (!manifest) throw new Error("Stored manifest is invalid");
+  return { manifest, etag };
+}
 
 /**
  * Saves only if nobody else saved since `etag` was read, keeps a history copy
  * and prunes history to the newest HISTORY_KEEP.
  */
 export async function writeManifest(manifest: Manifest, etag: string | null): Promise<void> {
-  const body = JSON.stringify(manifest, null, 2);
-  const headers: Record<string, string> = {
-    "content-type": "application/json",
-    "cache-control": "no-cache",
-    ...(etag ? { "if-match": etag } : { "if-none-match": "*" }),
-  };
-  const res = await r2(`${bucketUrl()}/manifest.json`, { method: "PUT", body, headers });
-  if (res.status === 412) throw new ConflictError("Manifest changed since it was read");
-  if (!res.ok) throw new Error(`Saving manifest failed: ${res.status}`);
-
-  const stamp = manifest.updatedAt.replace(/[:.]/g, "-");
-  await r2(`${bucketUrl()}/${HISTORY_PREFIX}${stamp}.json`, {
-    method: "PUT",
-    body,
-    headers: { "content-type": "application/json", "cache-control": "no-cache" },
-  });
-  const history = (await listObjects(HISTORY_PREFIX)).sort((a, b) => b.key.localeCompare(a.key));
-  await Promise.all(history.slice(HISTORY_KEEP).map((o) => deleteObject(o.key)));
+  await writeJson("manifest.json", manifest, etag);
+  // Best-effort: the save already succeeded, so a history hiccup must not report failure.
+  try {
+    const stamp = manifest.updatedAt.replace(/[:.]/g, "-");
+    await writeJson(`${HISTORY_PREFIX}${stamp}.json`, manifest, null);
+    const history = (await listObjects(HISTORY_PREFIX)).sort((a, b) => b.key.localeCompare(a.key));
+    await Promise.all(history.slice(HISTORY_KEEP).map((o) => deleteObject(o.key)));
+  } catch {}
 }
 
-interface ListedObject {
+/**
+ * Per-UTC-day upload reservations: presigned links count against the caps
+ * before they land, and deleting files doesn't hand slots back. One tiny file
+ * per day under usage/ (~365 a year; negligible storage).
+ */
+const ledgerKey = (now: Date) => `usage/${now.toISOString().slice(0, 10)}.json`;
+
+export async function readLedger(
+  now = new Date(),
+): Promise<{ ledger: DayLedger; etag: string | null }> {
+  const { json, etag } = await readJson(ledgerKey(now));
+  const j = (json ?? {}) as Partial<DayLedger>;
+  const ledger =
+    Number.isInteger(j.count) && Number.isInteger(j.bytes)
+      ? { count: j.count as number, bytes: j.bytes as number }
+      : { count: 0, bytes: 0 };
+  return { ledger, etag };
+}
+
+/** Throws ConflictError if another reservation landed since the read. */
+export async function writeLedger(
+  ledger: DayLedger,
+  etag: string | null,
+  now = new Date(),
+): Promise<void> {
+  await writeJson(ledgerKey(now), ledger, etag);
+}
+
+export interface ListedObject {
   key: string;
   bytes: number;
   lastModified: Date;
@@ -121,16 +161,9 @@ const decodeXml = (s: string) =>
     .replace(/&apos;/g, "'")
     .replace(/&amp;/g, "&");
 
-/** Whole-bucket size (what R2 bills) and media files added today (UTC). */
-export async function bucketUsage(now = new Date()): Promise<BucketUsage> {
-  const objects = await listObjects();
-  const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  return {
-    totalBytes: objects.reduce((sum, o) => sum + o.bytes, 0),
-    uploadsToday: objects.filter(
-      (o) => o.key.startsWith("media/") && o.lastModified.getTime() >= dayStart,
-    ).length,
-  };
+/** What the bucket holds now. One LIST (Class A): admin paths only, never public ones. */
+export async function bucketUsage(now = new Date()): Promise<LandedUsage> {
+  return landedUsage(await listObjects(), now);
 }
 
 /** Size of an object, or null if it doesn't exist. */
@@ -146,24 +179,32 @@ export async function deleteObject(key: string): Promise<void> {
   if (!res.ok && res.status !== 404) throw new Error(`DELETE ${key} failed: ${res.status}`);
 }
 
+/** Headers the browser must send with a presigned PUT (all are signed). */
+export function uploadHeaders(contentType: string, sha256Hex: string): Record<string, string> {
+  return {
+    "content-type": contentType,
+    "cache-control": "public, max-age=31536000, immutable",
+    "x-amz-checksum-sha256": Buffer.from(sha256Hex, "hex").toString("base64"),
+  };
+}
+
 /**
- * A 10-minute upload link for exactly this key, type and size: content-type and
- * content-length are signed, so R2 refuses any other file.
+ * A 2-minute upload link for exactly this key, type, size and content: the
+ * signed SHA-256 makes R2 refuse any other bytes, so a leaked or replayed link
+ * can only rewrite the identical file. Expiry is checked at request start, so
+ * slow uploads still finish.
  */
 export async function presignUpload(
   key: string,
   contentType: string,
   bytes: number,
+  sha256Hex: string,
 ): Promise<string> {
   const url = new URL(`${bucketUrl()}/${key}`);
-  url.searchParams.set("X-Amz-Expires", "600");
+  url.searchParams.set("X-Amz-Expires", "120");
   const signed = await client().sign(url.toString(), {
     method: "PUT",
-    headers: {
-      "content-type": contentType,
-      "content-length": String(bytes),
-      "cache-control": "public, max-age=31536000, immutable",
-    },
+    headers: { ...uploadHeaders(contentType, sha256Hex), "content-length": String(bytes) },
     aws: { signQuery: true, allHeaders: true },
   });
   return signed.url;

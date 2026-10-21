@@ -4,8 +4,14 @@ import { ChevronRight } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { requireAdmin } from "@/lib/admin/auth";
 import { adminCopy, type AdminSectionSlug } from "@/lib/admin/copy";
-import { MAX_UPLOADS_PER_DAY, STORAGE_BUDGET_BYTES, GB, MB } from "@/lib/media/limits";
-import { bucketUsage, readManifest } from "@/lib/media/store";
+import {
+  MAX_UPLOADS_PER_DAY,
+  STORAGE_BUDGET_BYTES,
+  GB,
+  MB,
+  withReservations,
+} from "@/lib/media/limits";
+import { bucketUsage, readLedger, readManifest } from "@/lib/media/store";
 
 const SECTION_DATA = { carrusel: "carousel", ejemplos: "examples" } as const;
 
@@ -51,7 +57,12 @@ function Meter({
  */
 export default async function AdminPage() {
   const email = await requireAdmin();
-  const [{ manifest }, usage] = await Promise.all([readManifest(), bucketUsage()]);
+  const [{ manifest }, landed, { ledger }] = await Promise.all([
+    readManifest(),
+    bucketUsage(),
+    readLedger(),
+  ]);
+  const usage = withReservations(landed, ledger);
   const used =
     usage.totalBytes >= GB
       ? `${(usage.totalBytes / GB).toFixed(2)} GB`

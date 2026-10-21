@@ -2,26 +2,39 @@
 
 import { updateTag } from "next/cache";
 import { getAdminEmail } from "@/lib/admin/auth";
+import { adminCopy } from "@/lib/admin/copy";
 import {
   addItem,
   moveItem,
   orphanedKeys,
+  referencedKeys,
   removeItem,
   toItemTexts,
   updateItemTexts,
   type ItemSection,
   type ItemTexts,
 } from "@/lib/media/edit";
-import { checkUpload, objectKey, UPLOAD_TYPES } from "@/lib/media/limits";
+import {
+  checkUpload,
+  landedUsage,
+  MEDIA_KEY,
+  objectKey,
+  POSTER_KEY,
+  UPLOAD_TYPES,
+  withReservations,
+} from "@/lib/media/limits";
 import { MEDIA_TAG } from "@/lib/media/load";
 import { parseManifest, type Manifest, type MediaFile } from "@/lib/media/manifest";
 import {
-  bucketUsage,
   ConflictError,
   deleteObject,
   headObject,
+  listObjects,
   presignUpload,
+  readLedger,
   readManifest,
+  uploadHeaders,
+  writeLedger,
   writeManifest,
 } from "@/lib/media/store";
 
@@ -32,9 +45,10 @@ import {
 
 export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
+const E = adminCopy.errors;
 const SECTIONS: ItemSection[] = ["carousel", "examples"];
-const DENIED = "Tu sesión expiró. Vuelve a iniciar sesión.";
-const CONFLICT = "Otro cambio se guardó mientras tanto. Recarga la página e inténtalo de nuevo.";
+/** Unreferenced media older than this is a failed or abandoned upload (links expire in 2 min). */
+const ORPHAN_AGE_MS = 60 * 60 * 1000;
 
 function fail(error: string): { ok: false; error: string } {
   return { ok: false, error };
@@ -44,21 +58,53 @@ export interface UploadTicket {
   key: string;
   /** Null when the identical file is already stored (no upload needed). */
   url: string | null;
+  /** Headers the PUT must carry; they are part of the signature. */
+  headers: Record<string, string>;
 }
 
-/** Checks caps and hands out a 10-minute upload link for one file. */
+/**
+ * Checks caps, reserves the upload in today's ledger and hands out a 2-minute
+ * upload link for one file. Also sweeps media left behind by failed uploads.
+ */
 export async function prepareUpload(req: {
   sha256: string;
   contentType: string;
   bytes: number;
 }): Promise<ActionResult<UploadTicket>> {
-  if (!(await getAdminEmail())) return fail(DENIED);
-  const usage = await bucketUsage();
-  const problem = checkUpload(req, usage);
-  if (problem) return fail(problem);
+  if (!(await getAdminEmail())) return fail(E.denied);
+  const invalid = checkUpload(req, { totalBytes: 0, uploadsToday: 0 });
+  if (invalid) return fail(invalid);
+
+  const now = new Date();
+  const [objects, { manifest }, { ledger, etag }] = await Promise.all([
+    listObjects(),
+    readManifest(),
+    readLedger(now),
+  ]);
+  const used = referencedKeys(manifest);
+  const stale = objects.filter(
+    (o) =>
+      o.key.startsWith("media/") &&
+      !used.has(o.key) &&
+      now.getTime() - o.lastModified.getTime() > ORPHAN_AGE_MS,
+  );
+  await Promise.all(stale.map((o) => deleteObject(o.key)));
+  const kept = objects.filter((o) => !stale.includes(o));
+
   const key = objectKey(req);
-  if ((await headObject(key)) !== null) return { ok: true, data: { key, url: null } };
-  return { ok: true, data: { key, url: await presignUpload(key, req.contentType, req.bytes) } };
+  const headers = uploadHeaders(req.contentType, req.sha256);
+  if (kept.some((o) => o.key === key)) return { ok: true, data: { key, url: null, headers } };
+
+  const problem = checkUpload(req, withReservations(landedUsage(kept, now), ledger));
+  if (problem) return fail(problem);
+  try {
+    await writeLedger({ count: ledger.count + 1, bytes: ledger.bytes + req.bytes }, etag, now);
+  } catch (err) {
+    if (err instanceof ConflictError) return fail(adminCopy.genericError);
+    throw err;
+  }
+  const url = await presignUpload(key, req.contentType, req.bytes, req.sha256);
+  return { ok: true, data: { key, url, headers } };
 }
 
 /** Re-reads the manifest, applies `edit`, validates, saves and refreshes the site. */
@@ -68,31 +114,40 @@ async function save(
   const { manifest, etag } = await readManifest();
   const edited = edit(manifest);
   if (typeof edited === "string") return fail(edited);
+  // Nothing changed (e.g. moving the first item up): skip the write and its history copy.
+  if (edited === manifest) return { ok: true, data: { before: manifest, after: manifest } };
   const next = parseManifest({ ...edited, updatedAt: new Date().toISOString() });
-  if (!next) return fail("Los datos no son válidos.");
+  if (!next) return fail(E.invalidData);
   try {
     await writeManifest(next, etag);
   } catch (err) {
-    if (err instanceof ConflictError) return fail(CONFLICT);
+    if (err instanceof ConflictError) return fail(E.conflict);
     throw err;
   }
   updateTag(MEDIA_TAG);
   return { ok: true, data: { before: manifest, after: next } };
 }
 
-/** Confirms an uploaded object exists with the size the browser reported. */
-async function verifyFile(file: MediaFile): Promise<string | null> {
-  const ext = file.key.split(".").pop();
-  const type = Object.values(UPLOAD_TYPES).find((t) => t.ext === ext);
-  if (!type || type.kind !== file.kind) return "Tipo de archivo no válido.";
-  const size = await headObject(file.key);
-  if (size === null || size !== file.bytes)
-    return "El archivo no terminó de subirse. Inténtalo de nuevo.";
-  if (file.kind === "video") {
-    if (!file.poster || (await headObject(file.poster)) === null)
-      return "Falta la imagen de portada del video.";
+const isDimension = (n: unknown) => Number.isInteger(n) && (n as number) > 0;
+
+/**
+ * Validates the browser's file description field by field (no extra fields
+ * reach the public manifest) and confirms the objects landed at that size.
+ */
+async function verifyFile(input: MediaFile): Promise<MediaFile | string> {
+  const { key, kind, width, height, bytes, poster } = input ?? {};
+  if (typeof key !== "string" || !MEDIA_KEY.test(key)) return E.invalidType;
+  const type = Object.values(UPLOAD_TYPES).find((t) => t.ext === key.split(".").pop());
+  if (!type || type.kind !== kind) return E.invalidType;
+  if (!isDimension(width) || !isDimension(height) || !isDimension(bytes)) return E.invalidData;
+  if (kind === "video" && (typeof poster !== "string" || !POSTER_KEY.test(poster))) {
+    return E.missingPoster;
   }
-  return null;
+  if (kind === "image" && poster !== undefined) return E.invalidData;
+
+  if ((await headObject(key)) !== bytes) return E.notUploaded;
+  if (poster && (await headObject(poster)) === null) return E.missingPoster;
+  return { key, kind, width, height, bytes, ...(poster ? { poster } : {}) };
 }
 
 export async function addMedia(input: {
@@ -100,18 +155,18 @@ export async function addMedia(input: {
   file: MediaFile;
   texts: ItemTexts;
 }): Promise<ActionResult> {
-  if (!(await getAdminEmail())) return fail(DENIED);
-  if (!SECTIONS.includes(input.section)) return fail("Sección no válida.");
-  if (input.section === "carousel" && input.file.kind !== "image") {
-    return fail("El carrusel solo admite fotos.");
+  if (!(await getAdminEmail())) return fail(E.denied);
+  if (!SECTIONS.includes(input.section)) return fail(E.invalidRequest);
+  if (input.section === "carousel" && input.file?.kind !== "image") {
+    return fail(E.carouselPhotosOnly);
   }
-  const problem = await verifyFile(input.file);
-  if (problem) return fail(problem);
+  const file = await verifyFile(input.file);
+  if (typeof file === "string") return fail(file);
   const texts = toItemTexts(input.texts);
   if (typeof texts === "string") return fail(texts);
 
   const result = await save((m) =>
-    addItem(m, input.section, { id: crypto.randomUUID(), file: input.file, ...texts }),
+    addItem(m, input.section, { id: crypto.randomUUID(), file, ...texts }),
   );
   return result.ok ? { ok: true, data: undefined } : result;
 }
@@ -121,8 +176,8 @@ export async function updateMedia(input: {
   id: string;
   texts: ItemTexts;
 }): Promise<ActionResult> {
-  if (!(await getAdminEmail())) return fail(DENIED);
-  if (!SECTIONS.includes(input.section)) return fail("Sección no válida.");
+  if (!(await getAdminEmail())) return fail(E.denied);
+  if (!SECTIONS.includes(input.section)) return fail(E.invalidRequest);
   const texts = toItemTexts(input.texts);
   if (typeof texts === "string") return fail(texts);
   const result = await save((m) => updateItemTexts(m, input.section, input.id, texts));
@@ -134,9 +189,9 @@ export async function moveMedia(input: {
   id: string;
   direction: -1 | 1;
 }): Promise<ActionResult> {
-  if (!(await getAdminEmail())) return fail(DENIED);
+  if (!(await getAdminEmail())) return fail(E.denied);
   if (!SECTIONS.includes(input.section) || ![-1, 1].includes(input.direction)) {
-    return fail("Petición no válida.");
+    return fail(E.invalidRequest);
   }
   const result = await save((m) => moveItem(m, input.section, input.id, input.direction));
   return result.ok ? { ok: true, data: undefined } : result;
@@ -147,10 +202,14 @@ export async function deleteMedia(input: {
   section: ItemSection;
   id: string;
 }): Promise<ActionResult> {
-  if (!(await getAdminEmail())) return fail(DENIED);
-  if (!SECTIONS.includes(input.section)) return fail("Sección no válida.");
+  if (!(await getAdminEmail())) return fail(E.denied);
+  if (!SECTIONS.includes(input.section)) return fail(E.invalidRequest);
   const result = await save((m) => removeItem(m, input.section, input.id));
   if (!result.ok) return result;
-  await Promise.all(orphanedKeys(result.data.before, result.data.after).map(deleteObject));
+  // Re-read: an add of the identical file may have re-referenced a key meanwhile.
+  const stillUsed = referencedKeys((await readManifest()).manifest);
+  const gone = orphanedKeys(result.data.before, result.data.after).filter((k) => !stillUsed.has(k));
+  // Best-effort: the entry is already gone; prepareUpload sweeps anything left behind.
+  await Promise.allSettled(gone.map(deleteObject));
   return { ok: true, data: undefined };
 }

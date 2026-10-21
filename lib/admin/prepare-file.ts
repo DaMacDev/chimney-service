@@ -4,6 +4,7 @@
  * the server needs to check the upload (hash, type, size, dimensions) is
  * computed here and re-verified server-side.
  */
+import { adminCopy } from "@/lib/admin/copy";
 import { IMAGE_MAX_SIDE, UPLOAD_TYPES, type UploadType } from "@/lib/media/limits";
 
 export interface PreparedBlob {
@@ -36,7 +37,11 @@ function draw(source: CanvasImageSource, width: number, height: number): HTMLCan
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(width * scale);
   canvas.height = Math.round(height * scale);
-  canvas.getContext("2d")!.drawImage(source, 0, 0, canvas.width, canvas.height);
+  const ctx = canvas.getContext("2d")!;
+  // JPEG has no alpha: transparent PNG areas would turn black.
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
   return canvas;
 }
 
@@ -70,6 +75,14 @@ function videoType(file: File): UploadType | null {
   return type && UPLOAD_TYPES[type].kind === "video" ? type : null;
 }
 
+/** Some files never fire their media events; fail into the friendly message instead of hanging. */
+function withTimeout<T>(promise: Promise<T>, ms = 15000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+  ]);
+}
+
 async function prepareVideo(file: File, contentType: UploadType): Promise<PreparedFile> {
   const url = URL.createObjectURL(file);
   try {
@@ -78,13 +91,16 @@ async function prepareVideo(file: File, contentType: UploadType): Promise<Prepar
     video.playsInline = true;
     video.preload = "auto";
     video.src = url;
-    await new Promise<void>((resolve, reject) => {
-      video.onloadeddata = () => resolve();
-      video.onerror = () => reject(new Error("unplayable"));
-    });
-    // Poster from ~1s in, or the middle of very short clips.
-    video.currentTime = Math.min(1, video.duration / 2);
-    await new Promise<void>((resolve) => (video.onseeked = () => resolve()));
+    await withTimeout(
+      new Promise<void>((resolve, reject) => {
+        video.onloadeddata = () => resolve();
+        video.onerror = () => reject(new Error("unplayable"));
+      }),
+    );
+    // Poster from ~1s in, or the middle of very short clips (duration can be NaN/Infinity).
+    const seeked = new Promise<void>((resolve) => (video.onseeked = () => resolve()));
+    video.currentTime = Number.isFinite(video.duration) ? Math.min(1, video.duration / 2) : 0;
+    await withTimeout(seeked);
     return {
       main: {
         blob: file,
@@ -106,16 +122,14 @@ export async function prepareFile(file: File): Promise<PreparedFile> {
     try {
       return await prepareImage(file);
     } catch {
-      throw new Error("No se pudo leer la foto. Prueba con un JPG o PNG.");
+      throw new Error(adminCopy.errors.unreadablePhoto);
     }
   }
   const type = videoType(file);
-  if (!type) throw new Error("Tipo de archivo no permitido. Usa fotos o videos MP4, WebM o MOV.");
+  if (!type) throw new Error(adminCopy.errors.typeNotAllowed);
   try {
     return await prepareVideo(file, type);
   } catch {
-    throw new Error(
-      "Este navegador no puede reproducir el video. Grábalo en formato «Más compatible» o envíalo por WhatsApp y vuelve a intentarlo.",
-    );
+    throw new Error(adminCopy.errors.unplayableVideo);
   }
 }

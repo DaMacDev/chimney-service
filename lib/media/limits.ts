@@ -2,6 +2,9 @@
  * Upload guardrails that keep the media bucket inside R2's free tier (ADR 0002).
  * Shared by the admin UI (early feedback) and the server (the real check).
  */
+import { adminCopy } from "@/lib/admin/copy";
+
+const E = adminCopy.errors;
 
 export const MB = 1024 * 1024;
 export const GB = 1024 * MB;
@@ -37,23 +40,59 @@ export interface BucketUsage {
   uploadsToday: number;
 }
 
+/** Bucket contents as listed, plus today's (UTC) share of new media. */
+export interface LandedUsage extends BucketUsage {
+  bytesToday: number;
+}
+
+/** Today's upload reservations (stored in R2, see store.ts). */
+export interface DayLedger {
+  count: number;
+  bytes: number;
+}
+
+export function landedUsage(
+  objects: { key: string; bytes: number; lastModified: Date }[],
+  now: Date,
+): LandedUsage {
+  const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const today = objects.filter(
+    (o) => o.key.startsWith("media/") && o.lastModified.getTime() >= dayStart,
+  );
+  return {
+    totalBytes: objects.reduce((sum, o) => sum + o.bytes, 0),
+    uploadsToday: today.length,
+    bytesToday: today.reduce((sum, o) => sum + o.bytes, 0),
+  };
+}
+
+/** Landed usage plus reservations that haven't landed yet (or were deleted since). */
+export function withReservations(landed: LandedUsage, ledger: DayLedger): BucketUsage {
+  return {
+    totalBytes: landed.totalBytes + Math.max(0, ledger.bytes - landed.bytesToday),
+    uploadsToday: Math.max(landed.uploadsToday, ledger.count),
+  };
+}
+
+/** Strict object-key shapes accepted from the browser. */
+export const MEDIA_KEY = /^media\/[a-f0-9]{24}\.(jpg|mp4|webm|mov)$/;
+export const POSTER_KEY = /^media\/[a-f0-9]{24}\.jpg$/;
+
 /** Returns a Spanish error for the owner, or null when the upload may proceed. */
 export function checkUpload(req: UploadRequest, usage: BucketUsage): string | null {
   const type = UPLOAD_TYPES[req.contentType as UploadType];
-  if (!type) return "Tipo de archivo no permitido. Usa fotos JPG o videos MP4, WebM o MOV.";
-  if (!/^[a-f0-9]{64}$/.test(req.sha256)) return "Archivo inválido.";
-  if (!Number.isInteger(req.bytes) || req.bytes <= 0) return "Archivo vacío o inválido.";
+  if (!type) return E.typeNotAllowed;
+  if (!/^[a-f0-9]{64}$/.test(req.sha256)) return E.invalidFile;
+  if (!Number.isInteger(req.bytes) || req.bytes <= 0) return E.emptyFile;
   const max = type.kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
   if (req.bytes > max) {
-    return type.kind === "image"
-      ? "La foto pesa más de 10 MB."
-      : "El video pesa más de 50 MB. Acórtalo o envíalo por WhatsApp para comprimirlo y vuelve a intentarlo.";
+    return type.kind === "image" ? E.photoTooBig : E.videoTooBig;
   }
   if (usage.uploadsToday >= MAX_UPLOADS_PER_DAY) {
-    return `Límite diario alcanzado (${MAX_UPLOADS_PER_DAY} archivos). Inténtalo mañana.`;
+    return E.dailyLimit(MAX_UPLOADS_PER_DAY);
   }
   if (usage.totalBytes + req.bytes > STORAGE_BUDGET_BYTES) {
-    return "Se alcanzó el espacio máximo (5 GB). Borra fotos o videos antiguos para subir más.";
+    return E.storageFull;
   }
   return null;
 }

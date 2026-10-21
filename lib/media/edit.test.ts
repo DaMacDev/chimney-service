@@ -1,11 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { addItem, moveItem, orphanedKeys, removeItem, toItemTexts, updateItemTexts } from "./edit";
-import { checkUpload, objectKey, MAX_UPLOADS_PER_DAY, STORAGE_BUDGET_BYTES, MB } from "./limits";
-import { EMPTY_MANIFEST, type MediaItem } from "./manifest";
+import {
+  checkUpload,
+  landedUsage,
+  objectKey,
+  withReservations,
+  MAX_UPLOADS_PER_DAY,
+  STORAGE_BUDGET_BYTES,
+  MB,
+} from "./limits";
+import { EMPTY_MANIFEST, type Manifest, type MediaItem } from "./manifest";
 
 const file = (key: string) => ({ key, kind: "image" as const, width: 10, height: 10, bytes: 5 });
 const item = (id: string, key = `media/${id}.jpg`): MediaItem => ({ id, file: file(key) });
 const sha = "a".repeat(64);
+/** Narrows an edit result that must have succeeded. */
+const ok = (result: Manifest | string): Manifest => {
+  if (typeof result === "string") throw new Error(result);
+  return result;
+};
 
 describe("checkUpload", () => {
   const empty = { totalBytes: 0, uploadsToday: 0 };
@@ -61,8 +74,11 @@ describe("toItemTexts", () => {
     expect(toItemTexts({ caption: { en: "Before" } })).toMatch(/español/);
   });
 
-  it("refuses over-long text", () => {
+  it("refuses over-long text and accepts the exact limit", () => {
     expect(toItemTexts({ name: { es: "x".repeat(121) } })).toMatch(/120/);
+    expect(toItemTexts({ name: { es: "x".repeat(120) } })).toEqual({
+      name: { es: "x".repeat(120) },
+    });
   });
 });
 
@@ -74,14 +90,18 @@ describe("manifest edits", () => {
   });
 
   it("moves an item and ignores moves past either end", () => {
-    expect(moveItem(base, "carousel", "b", -1).carousel.map((i) => i.id)).toEqual(["b", "a", "c"]);
+    expect(ok(moveItem(base, "carousel", "b", -1)).carousel.map((i) => i.id)).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
     expect(moveItem(base, "carousel", "a", -1)).toBe(base);
     expect(moveItem(base, "carousel", "c", 1)).toBe(base);
   });
 
   it("replaces texts without touching the file", () => {
     const next = updateItemTexts(base, "carousel", "a", { caption: { es: "Hola" } });
-    expect(next.carousel[0]).toEqual({ ...item("a"), caption: { es: "Hola" } });
+    expect(ok(next).carousel[0]).toEqual({ ...item("a"), caption: { es: "Hola" } });
   });
 
   it("reports only files no other entry still uses", () => {
@@ -90,7 +110,64 @@ describe("manifest edits", () => {
       carousel: [item("a"), item("b", "media/shared.jpg")],
       examples: [item("c", "media/shared.jpg")],
     };
-    expect(orphanedKeys(shared, removeItem(shared, "carousel", "a"))).toEqual(["media/a.jpg"]);
-    expect(orphanedKeys(shared, removeItem(shared, "carousel", "b"))).toEqual([]);
+    expect(orphanedKeys(shared, ok(removeItem(shared, "carousel", "a")))).toEqual(["media/a.jpg"]);
+    expect(orphanedKeys(shared, ok(removeItem(shared, "carousel", "b")))).toEqual([]);
+  });
+
+  it("reports a video's poster and keeps keys a pair still uses", () => {
+    const video: MediaItem = {
+      id: "v",
+      file: { ...file("media/v.mp4"), kind: "video", poster: "media/vp.jpg" },
+    };
+    const withPair = {
+      ...EMPTY_MANIFEST,
+      examples: [video, item("p")],
+      pairs: [
+        { id: "pair", before: { file: file("media/p.jpg") }, after: { file: file("media/q.jpg") } },
+      ],
+    };
+    expect(orphanedKeys(withPair, ok(removeItem(withPair, "examples", "v")))).toEqual([
+      "media/v.mp4",
+      "media/vp.jpg",
+    ]);
+    expect(orphanedKeys(withPair, ok(removeItem(withPair, "examples", "p")))).toEqual([]);
+  });
+
+  it("refuses edits to an item that no longer exists", () => {
+    expect(updateItemTexts(base, "carousel", "gone", {})).toMatch(/ya no existe/);
+    expect(moveItem(base, "carousel", "gone", 1)).toMatch(/ya no existe/);
+    expect(removeItem(base, "carousel", "gone")).toMatch(/ya no existe/);
+  });
+});
+
+describe("upload reservations", () => {
+  const now = new Date("2026-10-21T12:00:00Z");
+  const obj = (key: string, bytes: number, iso: string) => ({
+    key,
+    bytes,
+    lastModified: new Date(iso),
+  });
+  const landed = landedUsage(
+    [
+      obj("media/old.jpg", 100, "2026-10-20T23:00:00Z"),
+      obj("media/new.jpg", 50, "2026-10-21T01:00:00Z"),
+      obj("manifest.json", 5, "2026-10-21T02:00:00Z"),
+    ],
+    now,
+  );
+
+  it("counts only today's media as today's uploads", () => {
+    expect(landed).toEqual({ totalBytes: 155, uploadsToday: 1, bytesToday: 50 });
+  });
+
+  it("counts reserved-but-not-landed bytes and never hands deleted slots back", () => {
+    expect(withReservations(landed, { count: 4, bytes: 250 })).toEqual({
+      totalBytes: 355,
+      uploadsToday: 4,
+    });
+    expect(withReservations(landed, { count: 0, bytes: 0 })).toEqual({
+      totalBytes: 155,
+      uploadsToday: 1,
+    });
   });
 });
