@@ -13,7 +13,11 @@ import {
 } from "@/lib/media/limits";
 import { bucketUsage, readLedger, readManifest } from "@/lib/media/store";
 
-const SECTION_DATA = { carrusel: "carousel", ejemplos: "examples" } as const;
+const SECTION_DATA = {
+  carrusel: "carousel",
+  ejemplos: "examples",
+  "antes-despues": "pairs",
+} as const;
 
 function Meter({
   label,

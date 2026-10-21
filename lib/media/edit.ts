@@ -4,10 +4,12 @@
  */
 import { adminCopy } from "@/lib/admin/copy";
 import { TEXT_LIMITS } from "./limits";
-import type { LocalText, Manifest, MediaFile, MediaItem } from "./manifest";
+import type { BeforeAfterPair, LocalText, Manifest, MediaFile, MediaItem } from "./manifest";
 
-/** Sections the admin edits in #7 (before/after pairs come in #9). */
+/** Sections holding single photos/videos. */
 export type ItemSection = "carousel" | "examples";
+/** Every orderable list in the manifest. */
+export type Section = ItemSection | "pairs";
 
 export interface TextInput {
   es?: string;
@@ -19,6 +21,15 @@ export interface ItemTexts {
   caption?: TextInput;
   description?: TextInput;
 }
+
+export interface PairTexts {
+  name?: TextInput;
+  description?: TextInput;
+  beforeCaption?: TextInput;
+  afterCaption?: TextInput;
+}
+
+type CleanPairTexts = Partial<Record<keyof PairTexts, LocalText>>;
 
 /** Trims and checks one field. Empty = absent; English needs Spanish. */
 export function toLocalText(
@@ -47,6 +58,55 @@ export function toItemTexts(
   return out;
 }
 
+/** Like toItemTexts for a pair; side captions share the caption limit. */
+export function toPairTexts(texts: PairTexts): CleanPairTexts | string {
+  const out: CleanPairTexts = {};
+  const limit = {
+    name: "name",
+    description: "description",
+    beforeCaption: "caption",
+    afterCaption: "caption",
+  } as const;
+  for (const field of ["name", "beforeCaption", "afterCaption", "description"] as const) {
+    const value = toLocalText(texts[field], limit[field]);
+    if (typeof value === "string") return value;
+    if (value) out[field] = value;
+  }
+  return out;
+}
+
+/** Builds a pair from its two files and cleaned texts (absent texts are left out). */
+export function buildPair(
+  id: string,
+  before: MediaFile,
+  after: MediaFile,
+  texts: CleanPairTexts,
+): BeforeAfterPair {
+  return {
+    id,
+    before: { file: before, ...(texts.beforeCaption ? { caption: texts.beforeCaption } : {}) },
+    after: { file: after, ...(texts.afterCaption ? { caption: texts.afterCaption } : {}) },
+    ...(texts.name ? { name: texts.name } : {}),
+    ...(texts.description ? { description: texts.description } : {}),
+  };
+}
+
+export function addPair(manifest: Manifest, pair: BeforeAfterPair): Manifest {
+  return { ...manifest, pairs: [...manifest.pairs, pair] };
+}
+
+/** Replaces a pair's texts, keeping both files. */
+export function updatePairTexts(
+  manifest: Manifest,
+  id: string,
+  texts: CleanPairTexts,
+): Manifest | string {
+  const pair = manifest.pairs.find((p) => p.id === id);
+  if (!pair) return adminCopy.errors.notFound;
+  const next = buildPair(id, pair.before.file, pair.after.file, texts);
+  return { ...manifest, pairs: manifest.pairs.map((p) => (p.id === id ? next : p)) };
+}
+
 export function addItem(manifest: Manifest, section: ItemSection, item: MediaItem): Manifest {
   return { ...manifest, [section]: [...manifest[section], item] };
 }
@@ -68,11 +128,11 @@ export function updateItemTexts(
 
 export function moveItem(
   manifest: Manifest,
-  section: ItemSection,
+  section: Section,
   id: string,
   direction: -1 | 1,
 ): Manifest | string {
-  const items = [...manifest[section]];
+  const items: { id: string }[] = [...manifest[section]];
   const from = items.findIndex((item) => item.id === id);
   if (from < 0) return adminCopy.errors.notFound;
   const to = from + direction;
@@ -81,13 +141,10 @@ export function moveItem(
   return { ...manifest, [section]: items };
 }
 
-export function removeItem(
-  manifest: Manifest,
-  section: ItemSection,
-  id: string,
-): Manifest | string {
-  if (!manifest[section].some((item) => item.id === id)) return adminCopy.errors.notFound;
-  return { ...manifest, [section]: manifest[section].filter((item) => item.id !== id) };
+export function removeItem(manifest: Manifest, section: Section, id: string): Manifest | string {
+  const items: { id: string }[] = manifest[section];
+  if (!items.some((item) => item.id === id)) return adminCopy.errors.notFound;
+  return { ...manifest, [section]: items.filter((item) => item.id !== id) };
 }
 
 function fileKeys(file: MediaFile): string[] {

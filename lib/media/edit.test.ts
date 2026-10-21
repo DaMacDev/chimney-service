@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { addItem, moveItem, orphanedKeys, removeItem, toItemTexts, updateItemTexts } from "./edit";
+import {
+  addItem,
+  addPair,
+  buildPair,
+  moveItem,
+  orphanedKeys,
+  removeItem,
+  toItemTexts,
+  toPairTexts,
+  updateItemTexts,
+  updatePairTexts,
+} from "./edit";
 import {
   checkUpload,
   landedUsage,
@@ -169,5 +180,47 @@ describe("upload reservations", () => {
       totalBytes: 155,
       uploadsToday: 1,
     });
+  });
+});
+
+describe("pair edits", () => {
+  const pair = buildPair("p", file("media/b.jpg"), file("media/a.mp4"), {
+    beforeCaption: { es: "Sucio" },
+  });
+  const base = {
+    ...EMPTY_MANIFEST,
+    pairs: [pair, buildPair("q", file("media/c.jpg"), file("media/d.jpg"), {})],
+  };
+
+  it("builds a pair leaving absent texts out", () => {
+    expect(pair).toEqual({
+      id: "p",
+      before: { file: file("media/b.jpg"), caption: { es: "Sucio" } },
+      after: { file: file("media/a.mp4") },
+    });
+  });
+
+  it("cleans pair texts with the caption limit on each side", () => {
+    expect(toPairTexts({ afterCaption: { es: "  Limpio " }, name: {} })).toEqual({
+      afterCaption: { es: "Limpio" },
+    });
+    expect(toPairTexts({ beforeCaption: { es: "x".repeat(301) } })).toMatch(/300/);
+  });
+
+  it("adds, retitles, moves and removes pairs, keeping files", () => {
+    expect(addPair(EMPTY_MANIFEST, pair).pairs).toEqual([pair]);
+    const renamed = ok(updatePairTexts(base, "p", { name: { es: "Campana" } }));
+    expect(renamed.pairs[0]).toEqual({
+      id: "p",
+      before: { file: pair.before.file },
+      after: { file: pair.after.file },
+      name: { es: "Campana" },
+    });
+    expect(ok(moveItem(base, "pairs", "q", -1)).pairs.map((p) => p.id)).toEqual(["q", "p"]);
+    expect(orphanedKeys(base, ok(removeItem(base, "pairs", "p")))).toEqual([
+      "media/b.jpg",
+      "media/a.mp4",
+    ]);
+    expect(updatePairTexts(base, "gone", {})).toMatch(/ya no existe/);
   });
 });
