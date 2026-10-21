@@ -47,8 +47,9 @@ export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; e
 
 const E = adminCopy.errors;
 const SECTIONS: ItemSection[] = ["carousel", "examples"];
-/** Unreferenced media older than this is a failed or abandoned upload (links expire in 2 min). */
-const ORPHAN_AGE_MS = 60 * 60 * 1000;
+/** Unreferenced media older than this is a failed or abandoned upload (links expire in 2 min;
+ * a day leaves ample margin for an add racing the sweep). */
+const ORPHAN_AGE_MS = 24 * 60 * 60 * 1000;
 
 function fail(error: string): { ok: false; error: string } {
   return { ok: false, error };

@@ -124,18 +124,22 @@ function AddForm({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [texts, setTexts] = useState<ItemTexts>(EMPTY_TEXTS);
+  // The ref blocks a second click in the same tick; the state disables the button.
+  const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ tone: "info" | "error" | "ok"; text: string } | null>(
     null,
   );
 
   async function submit() {
+    if (inFlight.current) return;
     const file = fileRef.current?.files?.[0];
     if (!file) return setStatus({ tone: "error", text: adminCopy.chooseFile });
     // Before hashing: a multi-GB video would otherwise be read into memory first.
     if (!file.type.startsWith("image/") && file.size > MAX_VIDEO_BYTES) {
       return setStatus({ tone: "error", text: adminCopy.errors.videoTooBig });
     }
+    inFlight.current = true;
     setBusy(true);
     try {
       setStatus({ tone: "info", text: adminCopy.preparing });
@@ -170,6 +174,7 @@ function AddForm({
         text: err instanceof Error ? err.message : adminCopy.genericError,
       });
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
@@ -232,15 +237,18 @@ function ItemRow({
   };
   const [editing, setEditing] = useState(false);
   const [texts, setTexts] = useState<ItemTexts>(saved);
+  const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /** One action at a time: a double click must not move twice or delete twice. */
   async function run(action: () => Promise<ActionResult>, announcement?: string) {
-    if (busy) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     const result = await call(action());
+    inFlight.current = false;
     setBusy(false);
     if (!result.ok) return setError(result.error);
     onDone(announcement);
