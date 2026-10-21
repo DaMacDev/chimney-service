@@ -80,8 +80,9 @@ export function Footer() {
         </div>
       </div>
 
+      {/* pb-24 keeps the bottom line clear of the floating WhatsApp button. */}
       <div className="border-border-subtle border-t">
-        <div className="text-muted mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-6 py-5 text-xs sm:flex-row">
+        <div className="text-muted mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-6 pt-5 pb-24 text-xs sm:flex-row">
           <p>
             © {year} {siteConfig.name}. {t("rights")}
           </p>
