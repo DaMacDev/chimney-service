@@ -65,6 +65,24 @@ describe("PairCarousel", () => {
     expect(screen.getByText("Last")).toBeInTheDocument();
   });
 
+  it("ignores arrow keys pressed on controls inside the carousel", async () => {
+    renderCarousel();
+    screen.getByRole("button", { name: "Go to pair 3" }).focus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(screen.getByText("First")).toBeInTheDocument();
+  });
+
+  it("stays valid when the list shrinks", async () => {
+    const { rerender } = renderCarousel();
+    await userEvent.click(screen.getByRole("button", { name: "Go to pair 4" }));
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <PairCarousel pairs={pairs.slice(0, 2)} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText("Second")).toBeInTheDocument();
+  });
+
   it("shows no navigation for a single pair", () => {
     renderCarousel([pairs[0]]);
     expect(screen.getByText("First")).toBeInTheDocument();
