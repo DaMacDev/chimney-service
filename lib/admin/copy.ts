@@ -77,7 +77,7 @@ export const adminCopy = {
   moveDown: "Bajar posición",
   remove: "Borrar",
   confirmRemove: "¿Borrar este elemento de la galería? No se puede deshacer.",
-  untitled: "Sin título",
+  untitled: (position: number) => `Sin título (${position})`,
   video: "Video",
   genericError: "Algo salió mal. Inténtalo de nuevo.",
   uploadFailed: "No se pudo subir el archivo. Revisa tu conexión e inténtalo de nuevo.",

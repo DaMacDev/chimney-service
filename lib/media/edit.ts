@@ -36,8 +36,10 @@ export function toLocalText(
   input: TextInput | undefined,
   field: keyof typeof TEXT_LIMITS,
 ): LocalText | undefined | string {
-  const es = input?.es?.trim() ?? "";
-  const en = input?.en?.trim() ?? "";
+  // Typed loosely on purpose: this runs on whatever the browser posted.
+  const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const es = text(input?.es);
+  const en = text(input?.en);
   const max = TEXT_LIMITS[field];
   if (es.length > max || en.length > max) return adminCopy.errors.tooLong(max);
   if (!es && en) return adminCopy.errors.needSpanish;

@@ -55,7 +55,8 @@ const E = adminCopy.errors;
 const SECTIONS: ItemSection[] = ["carousel", "examples"];
 const ALL_SECTIONS: Section[] = [...SECTIONS, "pairs"];
 /** Unreferenced media older than this is a failed or abandoned upload (links expire in 2 min;
- * a day leaves ample margin for an add racing the sweep). */
+ * a day leaves ample margin for an add racing the sweep). Also clears the first file
+ * of a pair whose second upload failed. */
 const ORPHAN_AGE_MS = 24 * 60 * 60 * 1000;
 
 function fail(error: string): { ok: false; error: string } {

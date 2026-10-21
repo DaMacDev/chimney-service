@@ -79,8 +79,11 @@ Mérida. Next.js 16 + next-intl + Tailwind v4, deployed on Vercel.
       at `/admin` (allowlist `ADMIN_EMAILS`); gallery media + captions moved to the
       Cloudflare R2 bucket `nuevo-amanecer-media` with a `manifest.json`
       (`lib/media/`). The bundled gallery files above now live only in R2.
-- [ ] Owner media manager, part 2: R2 free-tier watchdog, admin uploads/edit,
-      before/after pair carousel (GitHub milestone "Owner media manager")
+- [x] **Owner media manager, part 2 (2026-10-21):** R2 free-tier watchdog Worker
+      (`watchdog/`, alerts 50%, public access off at 90%); `/admin` uploads, edits,
+      reorders and deletes carousel photos, cleaning examples and before/after pairs
+      (presigned uploads locked to size + SHA-256, 5 GB / 100-a-day caps with a
+      reservation ledger); gallery steps through several pairs one at a time.
 - [ ] Site-review improvement pass (2026-07-11) — 2 hero-contrast fixes + JSON-LD,
       WhatsApp float, CTA phone, skip link, form privacy note. Sonnet-ready plan:
       `docs/IMPROVEMENT-PLAN.md`

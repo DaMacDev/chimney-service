@@ -302,8 +302,9 @@ function ItemRow({
     }, adminCopy.saved);
 
   const t = item.texts;
-  const caption = t.caption?.es || t.beforeCaption?.es;
-  const title = t.name?.es || caption || adminCopy.untitled;
+  const caption = t.caption?.es || t.beforeCaption?.es || t.afterCaption?.es;
+  // The position keeps unnamed rows' button names unique for screen readers.
+  const title = t.name?.es || caption || adminCopy.untitled(index + 1);
 
   return (
     <li className="border-border-subtle bg-surface flex flex-col gap-3 rounded-2xl border p-3">
