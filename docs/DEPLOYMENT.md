@@ -71,7 +71,20 @@ and in a gitignored `.env.local`, never in the repo.
    `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and
    `NEXT_PUBLIC_MEDIA_BASE_URL` (the printed `r2.dev` URL) for Production and
    Preview.
-6. Redeploy. Sign in at `/admin`.
+6. **R2 usage watchdog** (`watchdog/`, hourly Cloudflare Worker). Needs two
+   tokens, stored only as Worker secrets:
+   - Cloudflare API token with **Account Analytics: Read** and **Workers R2
+     Storage: Edit** on this account.
+   - GitHub fine-grained token with **Issues: Read and write** on this repo only.
+   ```powershell
+   cd watchdog
+   npx wrangler@4 secret put CF_API_TOKEN
+   npx wrangler@4 secret put GITHUB_TOKEN
+   npx wrangler@4 deploy
+   ```
+   After a kill-switch issue, re-enable media with
+   `npx wrangler@4 r2 bucket dev-url enable nuevo-amanecer-media`.
+7. Redeploy. Sign in at `/admin`.
 
 ---
 

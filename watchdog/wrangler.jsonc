@@ -1,0 +1,14 @@
+// R2 free-tier watchdog (issue #12). Deploy: `npx wrangler@4 deploy` from this folder.
+// Secrets (never in this file): `npx wrangler@4 secret put CF_API_TOKEN` and `GITHUB_TOKEN`.
+{
+  "name": "r2-watchdog",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "triggers": { "crons": ["0 * * * *"] },
+  "vars": {
+    "ACCOUNT_ID": "8eb7124583aaf2693fc49b62ff1b299d",
+    "BUCKET": "nuevo-amanecer-media",
+    "GITHUB_REPO": "DaMacDev/chimney-service",
+  },
+  "observability": { "enabled": true },
+}
