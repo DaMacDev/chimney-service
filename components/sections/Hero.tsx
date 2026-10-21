@@ -51,7 +51,9 @@ export function Hero() {
           </Link>
         </div>
 
-        <p className="mt-10 max-w-md text-sm text-white/70">{t("trust")}</p>
+        <p className="mt-10 inline-flex w-fit max-w-md rounded-full bg-black/30 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
+          {t("trust")}
+        </p>
       </div>
     </section>
   );
