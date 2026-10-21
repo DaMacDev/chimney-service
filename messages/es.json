@@ -188,7 +188,10 @@
     "after": "Después",
     "speedLabel": "Velocidad",
     "speedOption": "{rate}×",
-    "speedOptionLabel": "Reproducir a {rate}× de velocidad"
+    "speedOptionLabel": "Reproducir a {rate}× de velocidad",
+    "prevPair": "Par anterior",
+    "nextPair": "Par siguiente",
+    "goToPair": "Ir al par {number}"
   },
   "CleaningExamples": {
     "title": "Ejemplos de limpieza",

@@ -188,7 +188,10 @@
     "after": "After",
     "speedLabel": "Speed",
     "speedOption": "{rate}×",
-    "speedOptionLabel": "Play at {rate}× speed"
+    "speedOptionLabel": "Play at {rate}× speed",
+    "prevPair": "Previous pair",
+    "nextPair": "Next pair",
+    "goToPair": "Go to pair {number}"
   },
   "CleaningExamples": {
     "title": "Cleaning examples",
