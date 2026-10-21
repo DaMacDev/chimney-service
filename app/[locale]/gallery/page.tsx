@@ -40,7 +40,7 @@ export default async function GalleryPage({ params }: Props) {
         <GalleryCarousel slides={gallery.carousel} />
       </section>
       <CleaningExamples items={gallery.examples} />
-      <BeforeAfterVideo pair={gallery.pairs[0]} />
+      <BeforeAfterVideo pairs={gallery.pairs} />
       <CtaBand />
     </main>
   );
