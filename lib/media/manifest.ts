@@ -69,7 +69,7 @@ export function mediaUrl(baseUrl: string, key: string): string {
 
 // --- validation: the manifest is read from storage, so check its shape ---
 
-const KEY_PATTERN = /^media\/[a-z0-9]+\.(jpg|jpeg|png|webp|mp4|webm)$/;
+const KEY_PATTERN = /^media\/[a-z0-9]+\.(jpg|jpeg|png|webp|mp4|webm|mov)$/;
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
@@ -88,7 +88,11 @@ function isFile(v: unknown): v is MediaFile {
     typeof v.key === "string" &&
     KEY_PATTERN.test(v.key) &&
     (v.kind === "image" || v.kind === "video") &&
-    [v.width, v.height, v.bytes].every((n) => typeof n === "number" && n > 0) &&
+    [v.width, v.height].every(
+      (n) => Number.isInteger(n) && (n as number) > 0 && (n as number) <= 20000,
+    ) &&
+    Number.isInteger(v.bytes) &&
+    (v.bytes as number) > 0 &&
     // Videos need a poster: with preload="none" there is no first frame to show.
     (v.kind === "video"
       ? typeof v.poster === "string" && KEY_PATTERN.test(v.poster)

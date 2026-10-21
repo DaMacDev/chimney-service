@@ -60,7 +60,8 @@ export function SpeedVideo({
         style={{ aspectRatio }}
         className="w-full bg-black object-cover"
       >
-        <source src={src} type={src.endsWith(".webm") ? "video/webm" : "video/mp4"} />
+        {/* No type: browsers sniff MP4/WebM/MOV themselves (Chrome skips "video/quicktime"). */}
+        <source src={src} />
       </video>
 
       <div

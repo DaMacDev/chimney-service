@@ -65,7 +65,8 @@ and in a gitignored `.env.local`, never in the repo.
    npx wrangler@4 r2 bucket create nuevo-amanecer-media
    npx wrangler@4 r2 bucket dev-url enable nuevo-amanecer-media
    ```
-   CORS must allow `GET, PUT, HEAD` with header `content-type` from the live
+   CORS must allow `GET, PUT, HEAD` with headers
+   `content-type, cache-control, x-amz-checksum-sha256` from the live
    origin and `http://localhost:3000` (`wrangler r2 bucket cors set`). Create an
    R2 API token (Object Read & Write, this bucket only) and set
    `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and
