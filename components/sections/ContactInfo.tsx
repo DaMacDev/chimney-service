@@ -13,12 +13,7 @@ export function ContactInfo() {
       value: siteConfig.phone,
       href: `tel:${siteConfig.phone.replace(/\s/g, "")}`,
     },
-    {
-      Icon: Mail,
-      title: t("emailTitle"),
-      value: siteConfig.email,
-      href: `mailto:${siteConfig.email}`,
-    },
+    { Icon: Mail, title: t("emailTitle"), value: siteConfig.email, href: `mailto:${siteConfig.email}` },
     ...siteConfig.whatsapps.map((wa) => ({
       Icon: WhatsappIcon,
       title: t("whatsappTitle"),

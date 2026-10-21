@@ -20,9 +20,7 @@ export function Equipment() {
                 <Icon className="size-5" aria-hidden />
               </span>
               <div>
-                <h3 className="font-display text-foreground font-bold">
-                  {t(`items.${key}.title`)}
-                </h3>
+                <h3 className="font-display text-foreground font-bold">{t(`items.${key}.title`)}</h3>
                 <p className="text-muted mt-1 text-sm leading-relaxed">
                   {t(`items.${key}.description`)}
                 </p>

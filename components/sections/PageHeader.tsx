@@ -20,9 +20,7 @@ export function PageHeader({ eyebrow, title, subtitle }: PageHeaderProps) {
         <Heading as="h1" size="section">
           <GradientText>{title}</GradientText>
         </Heading>
-        {subtitle && (
-          <p className="text-muted mt-4 max-w-2xl text-lg leading-relaxed">{subtitle}</p>
-        )}
+        {subtitle && <p className="text-muted mt-4 max-w-2xl text-lg leading-relaxed">{subtitle}</p>}
       </div>
     </section>
   );

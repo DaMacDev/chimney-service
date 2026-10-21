@@ -35,9 +35,6 @@ describe("LanguageSwitcher", () => {
   it("marks the active locale as pressed", () => {
     renderSwitcher();
     expect(screen.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Español" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    expect(screen.getByRole("button", { name: "Español" })).toHaveAttribute("aria-pressed", "false");
   });
 });
