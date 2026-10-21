@@ -69,7 +69,7 @@ export function mediaUrl(baseUrl: string, key: string): string {
 
 // --- validation: the manifest is read from storage, so check its shape ---
 
-const KEY_PATTERN = /^media\/[a-z0-9]+\.(jpg|jpeg|png|webp|mp4|webm)$/;
+const KEY_PATTERN = /^media\/[a-z0-9]+\.(jpg|jpeg|png|webp|mp4|webm|mov)$/;
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
