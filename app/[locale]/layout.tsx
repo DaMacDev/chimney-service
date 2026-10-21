@@ -74,7 +74,7 @@ export default async function LocaleLayout({
     <html lang={locale} className={`${inter.variable} ${fraunces.variable} h-full antialiased`}>
       <body className="bg-background text-foreground flex min-h-full flex-col">
         <a
-          href="#main"
+          href="#content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-full focus:bg-accent-strong focus:px-4 focus:py-2 focus:text-white"
         >
           {a11y("skipToContent")}
@@ -82,7 +82,7 @@ export default async function LocaleLayout({
         <SiteBackground />
         <NextIntlClientProvider>
           <NavBar />
-          <div id="main" tabIndex={-1} className="flex-1 outline-none">
+          <div id="content" tabIndex={-1} className="flex-1 outline-none">
             {children}
           </div>
           <Footer />
