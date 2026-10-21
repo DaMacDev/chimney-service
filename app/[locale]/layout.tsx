@@ -69,18 +69,24 @@ export default async function LocaleLayout({
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
+  const a11y = await getTranslations({ locale, namespace: "A11y" });
 
   return (
-    <html
-      lang={locale}
-      className={`${inter.variable} ${fraunces.variable} h-full antialiased`}
-    >
+    <html lang={locale} className={`${inter.variable} ${fraunces.variable} h-full antialiased`}>
       <body className="bg-background text-foreground flex min-h-full flex-col">
+        <a
+          href="#content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-full focus:bg-accent-strong focus:px-4 focus:py-2 focus:text-white"
+        >
+          {a11y("skipToContent")}
+        </a>
         <JsonLd />
         <SiteBackground />
         <NextIntlClientProvider>
           <NavBar />
-          <div className="flex-1">{children}</div>
+          <div id="content" tabIndex={-1} className="flex-1 outline-none">
+            {children}
+          </div>
           <Footer />
         </NextIntlClientProvider>
       </body>
