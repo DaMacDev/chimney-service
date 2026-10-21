@@ -261,13 +261,16 @@ function ItemRow({
   index,
   last,
   onDone,
+  onRemoved,
 }: {
   section: Section;
   item: ManagedItem;
   index: number;
   last: boolean;
   onDone: (announcement?: string) => void;
+  onRemoved: () => void;
 }) {
+  const rowRef = useRef<HTMLLIElement>(null);
   const [editing, setEditing] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [texts, setTexts] = useState<Texts>(item.texts);
@@ -325,7 +328,10 @@ function ItemRow({
   );
 
   return (
-    <li className="border-border-subtle bg-surface flex flex-col gap-3 rounded-2xl border p-3">
+    <li
+      ref={rowRef}
+      className="border-border-subtle bg-surface flex flex-col gap-3 rounded-2xl border p-3"
+    >
       <div className="flex items-center gap-3">
         {thumbs}
         <div className="min-w-0 flex-1">
@@ -405,10 +411,20 @@ function ItemRow({
           title={adminCopy.confirmRemoveTitle(title)}
           body={adminCopy.confirmRemove}
           confirmLabel={adminCopy.remove}
-          onCancel={() => setConfirmingRemove(false)}
+          onCancel={() => {
+            setConfirmingRemove(false);
+            // Back to the menu trigger once the modal is gone (the page is inert until then).
+            requestAnimationFrame(() =>
+              rowRef.current?.querySelector<HTMLElement>('[aria-haspopup="menu"]')?.focus(),
+            );
+          }}
           onConfirm={() => {
             setConfirmingRemove(false);
-            void run(() => deleteMedia({ section, id: item.id }), adminCopy.removed);
+            void run(async () => {
+              const result = await deleteMedia({ section, id: item.id });
+              if (result.ok) onRemoved();
+              return result;
+            }, adminCopy.removed);
           }}
         >
           {thumbs}
@@ -434,6 +450,7 @@ export function MediaManager({
   copy: { accept: string; hint: string; addTitle: string; emptyBody: string };
 }) {
   const router = useRouter();
+  const listRef = useRef<HTMLDivElement>(null);
   const [announcement, setAnnouncement] = useState("");
   const refresh = (message?: string) => {
     setAnnouncement(message ?? "");
@@ -452,7 +469,8 @@ export function MediaManager({
           title={copy.addTitle}
           onDone={() => refresh()}
         />
-        <div className="flex min-w-0 flex-col gap-3">
+        {/* Focus target after a delete removes the focused row. */}
+        <div ref={listRef} tabIndex={-1} className="flex min-w-0 flex-col gap-3 outline-none">
           <p className="text-muted text-sm">{copy.hint}</p>
           {items.length === 0 ? (
             <div className="border-border-subtle text-muted rounded-2xl border border-dashed p-8 text-center">
@@ -469,6 +487,7 @@ export function MediaManager({
                   index={i}
                   last={i === items.length - 1}
                   onDone={refresh}
+                  onRemoved={() => listRef.current?.focus()}
                 />
               ))}
             </ol>

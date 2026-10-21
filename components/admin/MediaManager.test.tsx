@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { adminCopy } from "@/lib/admin/copy";
 import { MediaManager, type ManagedItem } from "./MediaManager";
@@ -189,7 +189,22 @@ describe("MediaManager", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: adminCopy.remove }));
     const dialog = screen.getByRole("dialog", { name: adminCopy.confirmRemoveTitle("Campana") });
     expect(dialog).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: adminCopy.cancel })).toHaveFocus();
     await userEvent.click(within(dialog).getByRole("button", { name: adminCopy.cancel }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: `${adminCopy.moreActions}: Campana` });
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(actions.deleteMedia).not.toHaveBeenCalled();
+  });
+
+  it("closes without deleting on Esc", async () => {
+    renderManager([item("a", "Campana")]);
+    await userEvent.click(
+      screen.getByRole("button", { name: `${adminCopy.moreActions}: Campana` }),
+    );
+    await userEvent.click(screen.getByRole("menuitem", { name: adminCopy.remove }));
+    // jsdom doesn't map Esc to the dialog's cancel; the browser fires this close event.
+    fireEvent(screen.getByRole("dialog"), new Event("close"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(actions.deleteMedia).not.toHaveBeenCalled();
   });
@@ -205,5 +220,6 @@ describe("MediaManager", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: adminCopy.remove }));
     expect(actions.deleteMedia).toHaveBeenCalledTimes(1);
     expect(actions.deleteMedia).toHaveBeenCalledWith({ section: "examples", id: "a" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

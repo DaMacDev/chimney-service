@@ -24,6 +24,7 @@ if (!HTMLDialogElement.prototype.showModal) {
     this.open = true;
   };
   HTMLDialogElement.prototype.close = function () {
+    if (!this.open) return;
     this.open = false;
     this.dispatchEvent(new Event("close"));
   };

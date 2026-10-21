@@ -26,12 +26,15 @@ export function ConfirmDialog({
   onCancel: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const bodyId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
+    // Explicit, so reordering the buttons can never make Confirm the default.
+    cancelRef.current?.focus();
   }, []);
 
   return (
@@ -50,7 +53,7 @@ export function ConfirmDialog({
         {body}
       </p>
       <div className="mt-5 flex justify-end gap-2">
-        <Button variant="ghost" autoFocus onClick={onCancel}>
+        <Button ref={cancelRef} variant="ghost" onClick={onCancel}>
           {adminCopy.cancel}
         </Button>
         <Button variant="danger" onClick={onConfirm}>
