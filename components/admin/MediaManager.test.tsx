@@ -180,4 +180,30 @@ describe("MediaManager", () => {
     await userEvent.click(screen.getByRole("button", { name: `${adminCopy.edit}: Campana` }));
     expect(within(screen.getByRole("listitem")).getByLabelText(nameLabel)).toHaveValue("Campana");
   });
+
+  it("asks before deleting and deletes nothing on cancel", async () => {
+    renderManager([item("a", "Campana")]);
+    await userEvent.click(
+      screen.getByRole("button", { name: `${adminCopy.moreActions}: Campana` }),
+    );
+    await userEvent.click(screen.getByRole("menuitem", { name: adminCopy.remove }));
+    const dialog = screen.getByRole("dialog", { name: adminCopy.confirmRemoveTitle("Campana") });
+    expect(dialog).toBeVisible();
+    await userEvent.click(within(dialog).getByRole("button", { name: adminCopy.cancel }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(actions.deleteMedia).not.toHaveBeenCalled();
+  });
+
+  it("deletes once the owner confirms", async () => {
+    actions.deleteMedia.mockResolvedValue({ ok: true, data: undefined });
+    renderManager([item("a", "Campana")]);
+    await userEvent.click(
+      screen.getByRole("button", { name: `${adminCopy.moreActions}: Campana` }),
+    );
+    await userEvent.click(screen.getByRole("menuitem", { name: adminCopy.remove }));
+    const dialog = screen.getByRole("dialog", { name: adminCopy.confirmRemoveTitle("Campana") });
+    await userEvent.click(within(dialog).getByRole("button", { name: adminCopy.remove }));
+    expect(actions.deleteMedia).toHaveBeenCalledTimes(1);
+    expect(actions.deleteMedia).toHaveBeenCalledWith({ section: "examples", id: "a" });
+  });
 });

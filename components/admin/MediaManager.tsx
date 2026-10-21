@@ -15,6 +15,7 @@ import {
   updatePair,
   type ActionResult,
 } from "@/app/admin/actions";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { adminCopy } from "@/lib/admin/copy";
 import { prepareFile, type PreparedBlob } from "@/lib/admin/prepare-file";
 import type { ItemTexts, PairTexts, Section, TextInput } from "@/lib/media/edit";
@@ -268,6 +269,7 @@ function ItemRow({
   onDone: (announcement?: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [texts, setTexts] = useState<Texts>(item.texts);
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -306,29 +308,26 @@ function ItemRow({
   // The position keeps unnamed rows' button names unique for screen readers.
   const title = t.name?.es || caption || adminCopy.untitled(index + 1);
 
+  const thumbs = (
+    <div className="flex shrink-0 gap-1">
+      {item.thumbs.map((thumb, i) => (
+        <div key={i} className="relative size-20 overflow-hidden rounded-lg bg-black">
+          <Image src={thumb.src} alt="" fill unoptimized sizes="80px" className="object-cover" />
+          {(thumb.label || thumb.kind === "video") && (
+            <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded bg-black/70 px-1 text-[10px] text-white">
+              {thumb.kind === "video" && <Film className="size-3" aria-hidden />}
+              {thumb.label ?? adminCopy.video}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <li className="border-border-subtle bg-surface flex flex-col gap-3 rounded-2xl border p-3">
       <div className="flex items-center gap-3">
-        <div className="flex shrink-0 gap-1">
-          {item.thumbs.map((thumb, i) => (
-            <div key={i} className="relative size-20 overflow-hidden rounded-lg bg-black">
-              <Image
-                src={thumb.src}
-                alt=""
-                fill
-                unoptimized
-                sizes="80px"
-                className="object-cover"
-              />
-              {(thumb.label || thumb.kind === "video") && (
-                <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded bg-black/70 px-1 text-[10px] text-white">
-                  {thumb.kind === "video" && <Film className="size-3" aria-hidden />}
-                  {thumb.label ?? adminCopy.video}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
+        {thumbs}
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{title}</p>
           {caption && t.name?.es && <p className="text-muted truncate text-sm">{caption}</p>}
@@ -365,10 +364,7 @@ function ItemRow({
                   icon: <Trash2 className="size-4" aria-hidden />,
                   danger: true,
                   disabled: busy,
-                  onSelect: () =>
-                    window.confirm(adminCopy.confirmRemove)
-                      ? run(() => deleteMedia({ section, id: item.id }), adminCopy.removed)
-                      : undefined,
+                  onSelect: () => setConfirmingRemove(true),
                 },
               ]}
             />
@@ -403,6 +399,20 @@ function ItemRow({
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
+      )}
+      {confirmingRemove && (
+        <ConfirmDialog
+          title={adminCopy.confirmRemoveTitle(title)}
+          body={adminCopy.confirmRemove}
+          confirmLabel={adminCopy.remove}
+          onCancel={() => setConfirmingRemove(false)}
+          onConfirm={() => {
+            setConfirmingRemove(false);
+            void run(() => deleteMedia({ section, id: item.id }), adminCopy.removed);
+          }}
+        >
+          {thumbs}
+        </ConfirmDialog>
       )}
     </li>
   );

@@ -18,6 +18,17 @@ if (!("IntersectionObserver" in globalThis)) {
     MockIntersectionObserver as unknown as typeof IntersectionObserver;
 }
 
+// jsdom does not implement <dialog> modality; open/close is enough for tests.
+if (!HTMLDialogElement.prototype.showModal) {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.open = false;
+    this.dispatchEvent(new Event("close"));
+  };
+}
+
 // jsdom does not implement matchMedia; default to "no preference" so
 // reduced-motion code paths are testable by overriding matches per-test.
 if (!window.matchMedia) {
