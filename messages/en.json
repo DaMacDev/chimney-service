@@ -280,7 +280,11 @@
     "title": "Ready for a technical inspection?",
     "subtitle": "Join the hotels, hospitals and venues that trust Nuevo Amanecer with their critical-facility maintenance.",
     "primary": "Request a technical inspection",
-    "secondary": "See our services"
+    "secondary": "See our services",
+    "call": "Emergencies? Call us directly:"
+  },
+  "WhatsAppFloat": {
+    "label": "Chat with us on WhatsApp"
   },
   "LanguageSwitcher": {
     "label": "Change language"

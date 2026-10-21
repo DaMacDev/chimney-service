@@ -9,6 +9,7 @@ import { siteConfig } from "@/data/site";
 import { siteOrigin } from "@/lib/site-url";
 import { NavBar } from "@/components/layout/NavBar";
 import { Footer } from "@/components/layout/Footer";
+import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { SiteBackground } from "@/components/ui/site-background";
 
 export const viewport: Viewport = {
@@ -70,16 +71,14 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
 
   return (
-    <html
-      lang={locale}
-      className={`${inter.variable} ${fraunces.variable} h-full antialiased`}
-    >
+    <html lang={locale} className={`${inter.variable} ${fraunces.variable} h-full antialiased`}>
       <body className="bg-background text-foreground flex min-h-full flex-col">
         <SiteBackground />
         <NextIntlClientProvider>
           <NavBar />
           <div className="flex-1">{children}</div>
           <Footer />
+          <WhatsAppFloat />
         </NextIntlClientProvider>
       </body>
     </html>

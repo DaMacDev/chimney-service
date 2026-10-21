@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import { ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Heading } from "@/components/ui/heading";
+import { siteConfig } from "@/data/site";
 import { featureImages } from "@/data/gallery";
 
 export function CtaBand() {
@@ -40,6 +41,15 @@ export function CtaBand() {
               {t("secondary")}
             </Link>
           </div>
+          <p className="mt-6 text-sm text-white/85">
+            {t("call")}{" "}
+            <a
+              href={`tel:${siteConfig.phone.replace(/\s/g, "")}`}
+              className="inline-block py-3 font-semibold whitespace-nowrap underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              {siteConfig.phone}
+            </a>
+          </p>
         </div>
       </div>
     </section>
