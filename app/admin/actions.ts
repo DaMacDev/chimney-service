@@ -5,14 +5,20 @@ import { getAdminEmail } from "@/lib/admin/auth";
 import { adminCopy } from "@/lib/admin/copy";
 import {
   addItem,
+  addPair as addPairEntry,
+  buildPair,
   moveItem,
   orphanedKeys,
   referencedKeys,
   removeItem,
   toItemTexts,
+  toPairTexts,
   updateItemTexts,
+  updatePairTexts,
   type ItemSection,
   type ItemTexts,
+  type PairTexts,
+  type Section,
 } from "@/lib/media/edit";
 import {
   checkUpload,
@@ -39,7 +45,7 @@ import {
 } from "@/lib/media/store";
 
 /**
- * Owner-only gallery edits (#7). Every action re-checks the session: Server
+ * Owner-only gallery edits. Every action re-checks the session: Server
  * Actions are public endpoints. Next.js rejects cross-origin action posts.
  */
 
@@ -47,8 +53,10 @@ export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; e
 
 const E = adminCopy.errors;
 const SECTIONS: ItemSection[] = ["carousel", "examples"];
+const ALL_SECTIONS: Section[] = [...SECTIONS, "pairs"];
 /** Unreferenced media older than this is a failed or abandoned upload (links expire in 2 min;
- * a day leaves ample margin for an add racing the sweep). */
+ * a day leaves ample margin for an add racing the sweep). Also clears the first file
+ * of a pair whose second upload failed. */
 const ORPHAN_AGE_MS = 24 * 60 * 60 * 1000;
 
 function fail(error: string): { ok: false; error: string } {
@@ -185,13 +193,41 @@ export async function updateMedia(input: {
   return result.ok ? { ok: true, data: undefined } : result;
 }
 
+/** Adds a before/after pair; both files are required, photo or video in any mix. */
+export async function addPair(input: {
+  before: MediaFile;
+  after: MediaFile;
+  texts: PairTexts;
+}): Promise<ActionResult> {
+  if (!(await getAdminEmail())) return fail(E.denied);
+  const before = await verifyFile(input.before);
+  if (typeof before === "string") return fail(before);
+  const after = await verifyFile(input.after);
+  if (typeof after === "string") return fail(after);
+  const texts = toPairTexts(input.texts);
+  if (typeof texts === "string") return fail(texts);
+
+  const result = await save((m) =>
+    addPairEntry(m, buildPair(crypto.randomUUID(), before, after, texts)),
+  );
+  return result.ok ? { ok: true, data: undefined } : result;
+}
+
+export async function updatePair(input: { id: string; texts: PairTexts }): Promise<ActionResult> {
+  if (!(await getAdminEmail())) return fail(E.denied);
+  const texts = toPairTexts(input.texts);
+  if (typeof texts === "string") return fail(texts);
+  const result = await save((m) => updatePairTexts(m, input.id, texts));
+  return result.ok ? { ok: true, data: undefined } : result;
+}
+
 export async function moveMedia(input: {
-  section: ItemSection;
+  section: Section;
   id: string;
   direction: -1 | 1;
 }): Promise<ActionResult> {
   if (!(await getAdminEmail())) return fail(E.denied);
-  if (!SECTIONS.includes(input.section) || ![-1, 1].includes(input.direction)) {
+  if (!ALL_SECTIONS.includes(input.section) || ![-1, 1].includes(input.direction)) {
     return fail(E.invalidRequest);
   }
   const result = await save((m) => moveItem(m, input.section, input.id, input.direction));
@@ -199,12 +235,9 @@ export async function moveMedia(input: {
 }
 
 /** Removes the entry, then deletes its files if nothing else uses them (deletes are free). */
-export async function deleteMedia(input: {
-  section: ItemSection;
-  id: string;
-}): Promise<ActionResult> {
+export async function deleteMedia(input: { section: Section; id: string }): Promise<ActionResult> {
   if (!(await getAdminEmail())) return fail(E.denied);
-  if (!SECTIONS.includes(input.section)) return fail(E.invalidRequest);
+  if (!ALL_SECTIONS.includes(input.section)) return fail(E.invalidRequest);
   const result = await save((m) => removeItem(m, input.section, input.id));
   if (!result.ok) return result;
   // Re-read: an add of the identical file may have re-referenced a key meanwhile.

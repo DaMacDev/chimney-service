@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { adminCopy } from "@/lib/admin/copy";
 import { MediaManager, type ManagedItem } from "./MediaManager";
@@ -7,7 +7,9 @@ import { MediaManager, type ManagedItem } from "./MediaManager";
 const actions = vi.hoisted(() => ({
   prepareUpload: vi.fn(),
   addMedia: vi.fn(),
+  addPair: vi.fn(),
   updateMedia: vi.fn(),
+  updatePair: vi.fn(),
   moveMedia: vi.fn(),
   deleteMedia: vi.fn(),
 }));
@@ -18,19 +20,26 @@ vi.mock("@/lib/admin/prepare-file", () => ({ prepareFile }));
 
 const item = (id: string, name: string): ManagedItem => ({
   id,
-  kind: "image",
-  thumb: `https://media.test/media/${id}.jpg`,
-  name: { es: name },
-  caption: {},
-  description: {},
+  thumbs: [{ src: `https://media.test/media/${id}.jpg`, kind: "image" }],
+  texts: { name: { es: name } },
 });
 
-const renderManager = (items: ManagedItem[]) =>
-  render(<MediaManager section="examples" items={items} accept="image/*" hint="Pista" />);
+const renderManager = (items: ManagedItem[], section: "examples" | "pairs" = "examples") =>
+  render(
+    <MediaManager
+      section={section}
+      items={items}
+      copy={{ accept: "image/*", hint: "Pista", addTitle: "Agregar", emptyBody: "Vacío" }}
+    />,
+  );
+
+const photo = (name = "foto.jpg") => new File(["x"], name, { type: "image/jpeg" });
+const prepared = (sha: string) => ({
+  main: { blob: new Blob(["x"]), contentType: "image/jpeg", sha256: sha, width: 1, height: 1 },
+});
 
 async function chooseFile() {
-  const photo = new File(["x"], "foto.jpg", { type: "image/jpeg" });
-  await userEvent.upload(screen.getByLabelText(adminCopy.fileLabel), photo);
+  await userEvent.upload(screen.getByLabelText(adminCopy.fileLabel), photo());
 }
 
 beforeEach(() => vi.resetAllMocks());
@@ -104,6 +113,62 @@ describe("MediaManager", () => {
     expect(prepareFile).not.toHaveBeenCalled();
   });
 
+  it("requires both files for a pair", async () => {
+    renderManager([], "pairs");
+    await userEvent.upload(screen.getByLabelText(adminCopy.beforeFile), photo());
+    await userEvent.click(screen.getByRole("button", { name: adminCopy.upload }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(adminCopy.chooseBothFiles);
+    expect(prepareFile).not.toHaveBeenCalled();
+  });
+
+  it("uploads both sides and adds them as one pair", async () => {
+    prepareFile.mockResolvedValueOnce(prepared("b".repeat(64)));
+    prepareFile.mockResolvedValueOnce(prepared("c".repeat(64)));
+    actions.prepareUpload.mockImplementation(async ({ sha256 }: { sha256: string }) => ({
+      ok: true,
+      data: { key: `media/${sha256.slice(0, 24)}.jpg`, url: null, headers: {} },
+    }));
+    actions.addPair.mockResolvedValue({ ok: true, data: undefined });
+    renderManager([], "pairs");
+    // Regression: an earlier "choose both files" error must not lose the files chosen after it.
+    await userEvent.click(screen.getByRole("button", { name: adminCopy.upload }));
+    await screen.findByRole("alert");
+    // Button ignores a second click within 400 ms (single-flight); a person is slower.
+    await new Promise((r) => setTimeout(r, 450));
+    await userEvent.upload(screen.getByLabelText(adminCopy.beforeFile), photo("antes.jpg"));
+    await userEvent.upload(screen.getByLabelText(adminCopy.afterFile), photo("despues.jpg"));
+    await userEvent.type(
+      screen.getByLabelText(`${adminCopy.beforeCaption} (${adminCopy.optional})`),
+      "Sucio",
+    );
+    await userEvent.click(screen.getByRole("button", { name: adminCopy.upload }));
+    expect(await screen.findByText(adminCopy.uploaded)).toBeInTheDocument();
+    const [{ before, after, texts }] = actions.addPair.mock.calls[0];
+    expect(before.key).toBe(`media/${"b".repeat(24)}.jpg`);
+    expect(after.key).toBe(`media/${"c".repeat(24)}.jpg`);
+    expect(texts.beforeCaption).toEqual({ es: "Sucio" });
+    expect(actions.addMedia).not.toHaveBeenCalled();
+  });
+
+  it("shows both sides of a pair in its row", () => {
+    renderManager(
+      [
+        {
+          id: "p",
+          thumbs: [
+            { src: "https://media.test/b.jpg", kind: "image", label: adminCopy.before },
+            { src: "https://media.test/a.jpg", kind: "image", label: adminCopy.after },
+          ],
+          texts: { name: { es: "Campana" } },
+        },
+      ],
+      "pairs",
+    );
+    const row = screen.getByRole("listitem");
+    expect(within(row).getByText(adminCopy.before)).toBeInTheDocument();
+    expect(within(row).getByText(adminCopy.after)).toBeInTheDocument();
+  });
+
   it("discards unsaved edits on cancel", async () => {
     renderManager([item("a", "Campana")]);
     await userEvent.click(screen.getByRole("button", { name: `${adminCopy.edit}: Campana` }));
@@ -114,5 +179,47 @@ describe("MediaManager", () => {
     await userEvent.click(screen.getByRole("button", { name: adminCopy.cancel }));
     await userEvent.click(screen.getByRole("button", { name: `${adminCopy.edit}: Campana` }));
     expect(within(screen.getByRole("listitem")).getByLabelText(nameLabel)).toHaveValue("Campana");
+  });
+
+  it("asks before deleting and deletes nothing on cancel", async () => {
+    renderManager([item("a", "Campana")]);
+    await userEvent.click(
+      screen.getByRole("button", { name: `${adminCopy.moreActions}: Campana` }),
+    );
+    await userEvent.click(screen.getByRole("menuitem", { name: adminCopy.remove }));
+    const dialog = screen.getByRole("dialog", { name: adminCopy.confirmRemoveTitle("Campana") });
+    expect(dialog).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: adminCopy.cancel })).toHaveFocus();
+    await userEvent.click(within(dialog).getByRole("button", { name: adminCopy.cancel }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: `${adminCopy.moreActions}: Campana` });
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(actions.deleteMedia).not.toHaveBeenCalled();
+  });
+
+  it("closes without deleting on Esc", async () => {
+    renderManager([item("a", "Campana")]);
+    await userEvent.click(
+      screen.getByRole("button", { name: `${adminCopy.moreActions}: Campana` }),
+    );
+    await userEvent.click(screen.getByRole("menuitem", { name: adminCopy.remove }));
+    // jsdom doesn't map Esc to the dialog's cancel; the browser fires this close event.
+    fireEvent(screen.getByRole("dialog"), new Event("close"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(actions.deleteMedia).not.toHaveBeenCalled();
+  });
+
+  it("deletes once the owner confirms", async () => {
+    actions.deleteMedia.mockResolvedValue({ ok: true, data: undefined });
+    renderManager([item("a", "Campana")]);
+    await userEvent.click(
+      screen.getByRole("button", { name: `${adminCopy.moreActions}: Campana` }),
+    );
+    await userEvent.click(screen.getByRole("menuitem", { name: adminCopy.remove }));
+    const dialog = screen.getByRole("dialog", { name: adminCopy.confirmRemoveTitle("Campana") });
+    await userEvent.click(within(dialog).getByRole("button", { name: adminCopy.remove }));
+    expect(actions.deleteMedia).toHaveBeenCalledTimes(1);
+    expect(actions.deleteMedia).toHaveBeenCalledWith({ section: "examples", id: "a" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

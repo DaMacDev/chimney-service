@@ -7,85 +7,107 @@ import { Button, OverflowMenu, ScrollRegion } from "@vodkadav/ui";
 import { ArrowDown, ArrowUp, Film, Trash2 } from "lucide-react";
 import {
   addMedia,
+  addPair,
   deleteMedia,
   moveMedia,
   prepareUpload,
   updateMedia,
+  updatePair,
   type ActionResult,
 } from "@/app/admin/actions";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { adminCopy } from "@/lib/admin/copy";
 import { prepareFile, type PreparedBlob } from "@/lib/admin/prepare-file";
-import type { ItemSection, ItemTexts, TextInput } from "@/lib/media/edit";
+import type { ItemTexts, PairTexts, Section, TextInput } from "@/lib/media/edit";
 import { MAX_VIDEO_BYTES } from "@/lib/media/limits";
 import type { MediaFile } from "@/lib/media/manifest";
 
+type TextField = keyof ItemTexts | keyof PairTexts;
+type Texts = Partial<Record<TextField, TextInput>>;
+
 export interface ManagedItem {
   id: string;
-  kind: MediaFile["kind"];
-  thumb: string;
-  name: TextInput;
-  caption: TextInput;
-  description: TextInput;
+  /** One thumbnail per file: one for an item, before + after for a pair. */
+  thumbs: { src: string; kind: MediaFile["kind"]; label?: string }[];
+  texts: Texts;
 }
 
-const FIELDS = ["name", "caption", "description"] as const;
-const EMPTY_TEXTS: ItemTexts = { name: {}, caption: {}, description: {} };
+interface FieldDef {
+  key: TextField;
+  label: string;
+  multiline?: boolean;
+}
+
+const ITEM_FIELDS: FieldDef[] = [
+  { key: "name", label: adminCopy.name },
+  { key: "caption", label: adminCopy.caption },
+  { key: "description", label: adminCopy.description, multiline: true },
+];
+const PAIR_FIELDS: FieldDef[] = [
+  { key: "name", label: adminCopy.name },
+  { key: "beforeCaption", label: adminCopy.beforeCaption },
+  { key: "afterCaption", label: adminCopy.afterCaption },
+  { key: "description", label: adminCopy.description, multiline: true },
+];
+const fieldsOf = (section: Section) => (section === "pairs" ? PAIR_FIELDS : ITEM_FIELDS);
+
+/** File inputs per section; every slot is required. */
+const SLOTS: Record<Section, { key: string; label: string }[]> = {
+  carousel: [{ key: "file", label: adminCopy.fileLabel }],
+  examples: [{ key: "file", label: adminCopy.fileLabel }],
+  pairs: [
+    { key: "before", label: adminCopy.beforeFile },
+    { key: "after", label: adminCopy.afterFile },
+  ],
+};
 
 const inputClass =
   "border-border-subtle bg-background focus-visible:ring-accent w-full rounded-lg border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none";
 
-/** Name / caption / description in Spanish, plus optional English behind a toggle. */
+/** The section's text fields in Spanish, plus optional English behind a toggle. */
 function TextFields({
   idPrefix,
+  fields,
   value,
   onChange,
 }: {
   idPrefix: string;
-  value: ItemTexts;
-  onChange: (next: ItemTexts) => void;
+  fields: FieldDef[];
+  value: Texts;
+  onChange: (next: Texts) => void;
 }) {
-  const hasEnglish = FIELDS.some((f) => value[f]?.en);
-  const [english, setEnglish] = useState(hasEnglish);
-  const set = (field: (typeof FIELDS)[number], lang: "es" | "en", text: string) =>
-    onChange({ ...value, [field]: { ...value[field], [lang]: text } });
+  const [english, setEnglish] = useState(fields.some((f) => value[f.key]?.en));
+  const set = (key: TextField, lang: "es" | "en", text: string) =>
+    onChange({ ...value, [key]: { ...value[key], [lang]: text } });
 
-  const field = (f: (typeof FIELDS)[number], lang: "es" | "en") => {
-    const id = `${idPrefix}-${f}-${lang}`;
-    const label = `${adminCopy[f]}${lang === "en" ? ` ${adminCopy.englishSuffix}` : ""} (${adminCopy.optional})`;
-    const multiline = f === "description";
+  const field = (f: FieldDef, lang: "es" | "en") => {
+    const id = `${idPrefix}-${f.key}-${lang}`;
+    const label = `${f.label}${lang === "en" ? ` ${adminCopy.englishSuffix}` : ""} (${adminCopy.optional})`;
+    const props = {
+      id,
+      className: inputClass,
+      value: value[f.key]?.[lang] ?? "",
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+        set(f.key, lang, e.target.value),
+    };
     return (
       <div key={id} className="flex flex-col gap-1">
         <label htmlFor={id} className="text-sm font-medium">
           {label}
         </label>
-        {multiline ? (
-          <textarea
-            id={id}
-            rows={3}
-            className={inputClass}
-            value={value[f]?.[lang] ?? ""}
-            onChange={(e) => set(f, lang, e.target.value)}
-          />
-        ) : (
-          <input
-            id={id}
-            className={inputClass}
-            value={value[f]?.[lang] ?? ""}
-            onChange={(e) => set(f, lang, e.target.value)}
-          />
-        )}
+        {f.multiline ? <textarea rows={3} {...props} /> : <input {...props} />}
       </div>
     );
   };
 
   return (
     <div className="flex flex-col gap-3">
-      {FIELDS.map((f) => field(f, "es"))}
+      {fields.map((f) => field(f, "es"))}
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={english} onChange={(e) => setEnglish(e.target.checked)} />
         {adminCopy.englishToggle}
       </label>
-      {english && FIELDS.map((f) => field(f, "en"))}
+      {english && fields.map((f) => field(f, "en"))}
     </div>
   );
 }
@@ -113,59 +135,68 @@ async function uploadBlob(blob: PreparedBlob): Promise<string> {
   return ticket.data.key;
 }
 
+/** Prepares and uploads one chosen file (plus a video's poster); throws a Spanish message. */
+async function uploadFile(file: File): Promise<MediaFile> {
+  const prepared = await prepareFile(file);
+  const poster = prepared.poster ? await uploadBlob(prepared.poster) : undefined;
+  const key = await uploadBlob(prepared.main);
+  return {
+    key,
+    kind: prepared.poster ? "video" : "image",
+    width: prepared.main.width,
+    height: prepared.main.height,
+    bytes: prepared.main.blob.size,
+    ...(poster ? { poster } : {}),
+  };
+}
+
 function AddForm({
   section,
   accept,
+  title,
   onDone,
 }: {
-  section: ItemSection;
+  section: Section;
   accept: string;
+  title: string;
   onDone: () => void;
 }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [texts, setTexts] = useState<ItemTexts>(EMPTY_TEXTS);
-  // The ref blocks a second click in the same tick; the state disables the button.
-  const inFlight = useRef(false);
-  const [busy, setBusy] = useState(false);
+  const slots = SLOTS[section];
+  const [chosen, setChosen] = useState<Record<string, File | undefined>>({});
+  // Bumped after a successful upload to remount (clear) the file inputs.
+  const [inputsKey, setInputsKey] = useState(0);
+  const [texts, setTexts] = useState<Texts>({});
   const [status, setStatus] = useState<{ tone: "info" | "error" | "ok"; text: string } | null>(
     null,
   );
 
+  /** Button single-flights this (it returns a promise), so a double click adds once. */
   async function submit() {
-    if (inFlight.current) return;
-    const file = fileRef.current?.files?.[0];
-    if (!file) return setStatus({ tone: "error", text: adminCopy.chooseFile });
+    const files = slots.map((slot) => chosen[slot.key]);
+    if (files.some((f) => !f)) {
+      const text = slots.length > 1 ? adminCopy.chooseBothFiles : adminCopy.chooseFile;
+      return setStatus({ tone: "error", text });
+    }
     // Before hashing: a multi-GB video would otherwise be read into memory first.
-    if (!file.type.startsWith("image/") && file.size > MAX_VIDEO_BYTES) {
+    if (files.some((f) => !f!.type.startsWith("image/") && f!.size > MAX_VIDEO_BYTES)) {
       return setStatus({ tone: "error", text: adminCopy.errors.videoTooBig });
     }
-    inFlight.current = true;
-    setBusy(true);
     try {
-      setStatus({ tone: "info", text: adminCopy.preparing });
-      const prepared = await prepareFile(file);
-      setStatus({ tone: "info", text: adminCopy.uploading });
-      const poster = prepared.poster ? await uploadBlob(prepared.poster) : undefined;
-      const key = await uploadBlob(prepared.main);
+      const uploaded: MediaFile[] = [];
+      for (const file of files) {
+        setStatus({ tone: "info", text: adminCopy.uploading });
+        uploaded.push(await uploadFile(file!));
+      }
       setStatus({ tone: "info", text: adminCopy.saving });
-      const kind = prepared.poster ? "video" : "image";
       const result = await call(
-        addMedia({
-          section,
-          file: {
-            key,
-            kind,
-            width: prepared.main.width,
-            height: prepared.main.height,
-            bytes: prepared.main.blob.size,
-            ...(poster ? { poster } : {}),
-          },
-          texts,
-        }),
+        section === "pairs"
+          ? addPair({ before: uploaded[0], after: uploaded[1], texts })
+          : addMedia({ section, file: uploaded[0], texts }),
       );
       if (!result.ok) throw new Error(result.error);
-      setTexts(EMPTY_TEXTS);
-      if (fileRef.current) fileRef.current.value = "";
+      setTexts({});
+      setChosen({});
+      setInputsKey((k) => k + 1);
       setStatus({ tone: "ok", text: adminCopy.uploaded });
       onDone();
     } catch (err) {
@@ -173,9 +204,6 @@ function AddForm({
         tone: "error",
         text: err instanceof Error ? err.message : adminCopy.genericError,
       });
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
     }
   }
 
@@ -185,22 +213,32 @@ function AddForm({
       className="border-border-subtle bg-surface flex flex-col gap-4 rounded-2xl border p-5"
     >
       <h2 id={`add-${section}`} className="font-semibold">
-        {adminCopy.addTitle}
+        {title}
       </h2>
-      <div className="flex flex-col gap-1">
-        <label htmlFor={`file-${section}`} className="text-sm font-medium">
-          {adminCopy.fileLabel}
-        </label>
-        <input
-          id={`file-${section}`}
-          ref={fileRef}
-          type="file"
-          accept={accept}
-          className="text-sm"
-        />
-        <p className="text-muted text-xs">{adminCopy.fileHelp}</p>
-      </div>
-      <TextFields idPrefix={`new-${section}`} value={texts} onChange={setTexts} />
+      {slots.map((slot) => (
+        <div key={`${slot.key}-${inputsKey}`} className="flex flex-col gap-1">
+          <label htmlFor={`file-${section}-${slot.key}`} className="text-sm font-medium">
+            {slot.label}
+          </label>
+          <input
+            id={`file-${section}-${slot.key}`}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              setChosen((prev) => ({ ...prev, [slot.key]: file }));
+            }}
+            type="file"
+            accept={accept}
+            className="text-sm"
+          />
+        </div>
+      ))}
+      <p className="text-muted -mt-2 text-xs">{adminCopy.fileHelp}</p>
+      <TextFields
+        idPrefix={`new-${section}`}
+        fields={fieldsOf(section)}
+        value={texts}
+        onChange={setTexts}
+      />
       {/* Kept mounted so screen readers announce changes to it. */}
       <p role="status" className="text-muted text-sm empty:hidden">
         {status && status.tone !== "error" ? status.text : ""}
@@ -210,7 +248,7 @@ function AddForm({
           {status.text}
         </p>
       )}
-      <Button variant="primary" onClick={submit} disabled={busy}>
+      <Button variant="primary" onClick={submit}>
         {adminCopy.upload}
       </Button>
     </section>
@@ -223,20 +261,19 @@ function ItemRow({
   index,
   last,
   onDone,
+  onRemoved,
 }: {
-  section: ItemSection;
+  section: Section;
   item: ManagedItem;
   index: number;
   last: boolean;
   onDone: (announcement?: string) => void;
+  onRemoved: () => void;
 }) {
-  const saved: ItemTexts = {
-    name: item.name,
-    caption: item.caption,
-    description: item.description,
-  };
+  const rowRef = useRef<HTMLLIElement>(null);
   const [editing, setEditing] = useState(false);
-  const [texts, setTexts] = useState<ItemTexts>(saved);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [texts, setTexts] = useState<Texts>(item.texts);
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -260,24 +297,46 @@ function ItemRow({
       adminCopy.movedTo(index + 1 + direction),
     );
 
-  const title = item.name.es || item.caption.es || adminCopy.untitled;
+  const save = () =>
+    run(async () => {
+      const result = await (section === "pairs"
+        ? updatePair({ id: item.id, texts })
+        : updateMedia({ section, id: item.id, texts }));
+      if (result.ok) setEditing(false);
+      return result;
+    }, adminCopy.saved);
 
-  return (
-    <li className="border-border-subtle bg-surface flex flex-col gap-3 rounded-2xl border p-3">
-      <div className="flex items-center gap-3">
-        <div className="relative size-20 shrink-0 overflow-hidden rounded-lg bg-black">
-          <Image src={item.thumb} alt="" fill unoptimized sizes="80px" className="object-cover" />
-          {item.kind === "video" && (
+  const t = item.texts;
+  const caption = t.caption?.es || t.beforeCaption?.es || t.afterCaption?.es;
+  // The position keeps unnamed rows' button names unique for screen readers.
+  const title = t.name?.es || caption || adminCopy.untitled(index + 1);
+
+  const thumbs = (
+    <div className="flex shrink-0 gap-1">
+      {item.thumbs.map((thumb, i) => (
+        <div key={i} className="relative size-20 overflow-hidden rounded-lg bg-black">
+          <Image src={thumb.src} alt="" fill unoptimized sizes="80px" className="object-cover" />
+          {(thumb.label || thumb.kind === "video") && (
             <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded bg-black/70 px-1 text-[10px] text-white">
-              <Film className="size-3" aria-hidden /> {adminCopy.video}
+              {thumb.kind === "video" && <Film className="size-3" aria-hidden />}
+              {thumb.label ?? adminCopy.video}
             </span>
           )}
         </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <li
+      ref={rowRef}
+      className="border-border-subtle bg-surface flex flex-col gap-3 rounded-2xl border p-3"
+    >
+      <div className="flex items-center gap-3">
+        {thumbs}
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{title}</p>
-          {item.caption.es && item.name.es && (
-            <p className="text-muted truncate text-sm">{item.caption.es}</p>
-          )}
+          {caption && t.name?.es && <p className="text-muted truncate text-sm">{caption}</p>}
         </div>
         {!editing && (
           <div className="flex shrink-0 items-center gap-1">
@@ -311,10 +370,7 @@ function ItemRow({
                   icon: <Trash2 className="size-4" aria-hidden />,
                   danger: true,
                   disabled: busy,
-                  onSelect: () =>
-                    window.confirm(adminCopy.confirmRemove)
-                      ? run(() => deleteMedia({ section, id: item.id }), adminCopy.removed)
-                      : undefined,
+                  onSelect: () => setConfirmingRemove(true),
                 },
               ]}
             />
@@ -323,25 +379,20 @@ function ItemRow({
       </div>
       {editing && (
         <div className="flex flex-col gap-3">
-          <TextFields idPrefix={`edit-${item.id}`} value={texts} onChange={setTexts} />
+          <TextFields
+            idPrefix={`edit-${item.id}`}
+            fields={fieldsOf(section)}
+            value={texts}
+            onChange={setTexts}
+          />
           <div className="flex gap-2">
-            <Button
-              variant="primary"
-              disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  const result = await updateMedia({ section, id: item.id, texts });
-                  if (result.ok) setEditing(false);
-                  return result;
-                }, adminCopy.saved)
-              }
-            >
+            <Button variant="primary" disabled={busy} onClick={save}>
               {adminCopy.save}
             </Button>
             <Button
               variant="ghost"
               onClick={() => {
-                setTexts(saved);
+                setTexts(item.texts);
                 setEditing(false);
               }}
             >
@@ -354,6 +405,30 @@ function ItemRow({
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
+      )}
+      {confirmingRemove && (
+        <ConfirmDialog
+          title={adminCopy.confirmRemoveTitle(title)}
+          body={adminCopy.confirmRemove}
+          confirmLabel={adminCopy.remove}
+          onCancel={() => {
+            setConfirmingRemove(false);
+            // Back to the menu trigger once the modal is gone (the page is inert until then).
+            requestAnimationFrame(() =>
+              rowRef.current?.querySelector<HTMLElement>('[aria-haspopup="menu"]')?.focus(),
+            );
+          }}
+          onConfirm={() => {
+            setConfirmingRemove(false);
+            void run(async () => {
+              const result = await deleteMedia({ section, id: item.id });
+              if (result.ok) onRemoved();
+              return result;
+            }, adminCopy.removed);
+          }}
+        >
+          {thumbs}
+        </ConfirmDialog>
       )}
     </li>
   );
@@ -368,15 +443,14 @@ function ItemRow({
 export function MediaManager({
   section,
   items,
-  accept,
-  hint,
+  copy,
 }: {
-  section: ItemSection;
+  section: Section;
   items: ManagedItem[];
-  accept: string;
-  hint: string;
+  copy: { accept: string; hint: string; addTitle: string; emptyBody: string };
 }) {
   const router = useRouter();
+  const listRef = useRef<HTMLDivElement>(null);
   const [announcement, setAnnouncement] = useState("");
   const refresh = (message?: string) => {
     setAnnouncement(message ?? "");
@@ -389,13 +463,19 @@ export function MediaManager({
         <p role="status" className="sr-only">
           {announcement}
         </p>
-        <AddForm section={section} accept={accept} onDone={() => refresh()} />
-        <div className="flex min-w-0 flex-col gap-3">
-          <p className="text-muted text-sm">{hint}</p>
+        <AddForm
+          section={section}
+          accept={copy.accept}
+          title={copy.addTitle}
+          onDone={() => refresh()}
+        />
+        {/* Focus target after a delete removes the focused row. */}
+        <div ref={listRef} tabIndex={-1} className="flex min-w-0 flex-col gap-3 outline-none">
+          <p className="text-muted text-sm">{copy.hint}</p>
           {items.length === 0 ? (
             <div className="border-border-subtle text-muted rounded-2xl border border-dashed p-8 text-center">
               <p className="text-foreground font-medium">{adminCopy.emptyTitle}</p>
-              <p className="text-sm">{adminCopy.emptyBody}</p>
+              <p className="text-sm">{copy.emptyBody}</p>
             </div>
           ) : (
             <ol className="flex flex-col gap-3">
@@ -407,6 +487,7 @@ export function MediaManager({
                   index={i}
                   last={i === items.length - 1}
                   onDone={refresh}
+                  onRemoved={() => listRef.current?.focus()}
                 />
               ))}
             </ol>
